@@ -74,3 +74,4 @@ model.add(Dense(120, kernel_size=(5,5), activation='relu', input_shape=(28,28,6)
 # F6
 
 # outputlayer, apply RBF
+#curious.. do i have to add weight? and how to apply tanh function in F6 and houw to do layering for 4.. itS makmak desnune
