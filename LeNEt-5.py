@@ -43,7 +43,7 @@ y_test = tensorflow.keras.utils.to_categorical(y_test, num_classes)'''
 
 model = Sequential()
 # C1 (first layer)
-model.add(Conv2D(32, kernel_size=(5,5), activation='relu', input_shape=(28,28,6) ))
+model.add(Conv2D(filters=6, kernel_size=(5,5), activation='relu', input_shape=(32,32,1) ))
 
 # S2 subsampling
 model.add(
@@ -51,27 +51,51 @@ model.add(
         pool_size=(2, 2), strides=(2,2), padding='valid', data_format=None,
     )
 )
+# model.add(layers.AveragePooling2D)
 # strides=(2,2) it means no overlapping
 
-# C3   THERE ARE 4 WAY..
+# C3
+model.add(Conv2D(filters=6, kernel_size=(5,5), activation='relu', input_shape=(28,28,6) ))
 
-# (1) (5*5*3+1)*6 = 456 (연속한 3장씩 5*5*3 필터와 컨볼루션)
-# (2)  (5*5*4+1)*6 = 606 (연속한 4 장씩 5*5*4 필터와 컨볼루션)
-# (3) (5*5*4+1)*3 = 303 (불연속한 4장씩 5*5*4 사이즈의 필터와 컨볼루션)
-# (4) (5*5*6+1)*1 = 151 (6장의 14*14 특성맵 모두를 가지고 필터와 컨볼루션)
-
-
-# S4  ..???
+# S4
 model.add(
     tf.keras.layers.AveragePooling2D(
         pool_size=(2, 2), strides=None, padding='valid', data_format=None,
     )
 )
+# Flatten
+model.tf.keras.layers.Flatten()
 
 # C5
-model.add(Dense(120, kernel_size=(5,5), activation='relu', input_shape=(28,28,6) ))
+model.add(Dense(120, activation='relu'))
 
 # F6
+model.add(Dense(84, activation='relu'))
 
-# outputlayer, apply RBF
-#curious.. do i have to add weight? and how to apply tanh function in F6 and houw to do layering for 4.. itS makmak desnune
+# outputlayer
+model.add(Dense(10, activation='relu'))
+
+## compile
+model.compile(loss=tensorflow.keras.losses.categorical_crossentropy,
+              optimizer="adam",
+              metrics=['accuracy'])
+
+
+history=model.fit(x_train, y_train,
+          batch_size=batch_size,
+          epochs=epochs,
+          verbose=1,
+          validation_data=(x_test, y_test))
+
+score = model.evaluate(x_test, y_test, verbose=0)
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+
+##-- summarize history for accuracy
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
