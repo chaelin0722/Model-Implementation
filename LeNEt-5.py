@@ -4,41 +4,68 @@ import tensorflow.keras
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Flatten
-from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import Conv2D, MaxPooling2D
 import matplotlib.pyplot as plt
+from tensorflow.keras import backend as K
 from PIL import Image
 import numpy as np
 import os
 
 batch_size = 128  #arbitary//
 num_classes = 10
-epochs = 50
+epochs = 5
 
 #input image 32x32, each characters should center aligned. each pixels white-> -1.0, black -> 1.175
-img_rows, img_cols = 32, 32
+img_rows, img_cols = 28,28
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
+
+if K.image_data_format() == 'channels_first':
+    x_train = x_train.reshape(x_train.shape[0], 1, img_rows, img_cols)
+    x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
+    input_shape = (1, img_rows, img_cols)
+else:
+    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+    input_shape = (img_rows, img_cols, 1)
+
+print("inputshape",input_shape)
+
 x_train = x_train.astype('float32')
 x_test = x_test.astype('float32')
 x_train /= 255
 x_test /= 255
-print('x_train shape:', x_train.shape)
-print(x_train.shape[0], 'train samples')
-print(x_test.shape[0], 'test samples')
+print('x_train shape:', x_train.shape)  #x_train shape: (60000, 28, 28)
+print(x_train.shape[0], 'train samples') #60000 train samples
+print(x_test.shape[0], 'test samples') #10000 test samples
+
 # convert class vectors to binary class matrices
 y_train = tensorflow.keras.utils.to_categorical(y_train, num_classes)
 y_test = tensorflow.keras.utils.to_categorical(y_test, num_classes)
+print(x_train[0].shape)
+## for check
+# plt.imshow(x_train[1], cmap=plt.cm.binary)
+# plt.show()
+# print(y_train[1])
+print("Before Reshape - x_train_norm shape: {}".format(x_train.shape))
+print("Before Reshape - x_test_norm shape: {}".format(x_test.shape))
+
+x_train_reshaped=x_train.reshape( -1, 28, 28, 1)  # 데이터갯수에 -1을 쓰면 reshape시 자동계산됩니다.
+x_test_reshaped=x_test.reshape( -1, 28, 28, 1)
+#(60000, 28, 28)로 채널수에 대한 정보가 없다. 따라서 (60000, 28, 28, 1)로 만들어 주어야 한다. 여기서 채널수 1은 흑백 이미지를 의미
+
+print("After Reshape - x_train_reshaped shape: {}".format(x_train_reshaped.shape))
+print("After Reshape - x_test_reshaped shape: {}".format(x_test_reshaped.shape))
 
 model = tf.keras.models.Sequential([
     # C1 (first layer)
-    tf.keras.layers.Conv2D(filters=6, kernel_size=(5,5), activation='relu', input_shape=(32,32,1)),
-
+    tf.keras.layers.Conv2D(filters=6, kernel_size=(5,5), activation='relu',input_shape=input_shape), #confuse here.. 32,32,1 is the input.. but why
     # S2 subsampling    # strides=(2,2) it means no overlapping
     tf.keras.layers.AveragePooling2D( pool_size=(2, 2), strides=(2,2), padding='valid', data_format=None),
     # C3
-    tf.keras.layers.Conv2D(filters=6, kernel_size=(5,5), activation='relu', input_shape=(28,28,6) ),
+    tf.keras.layers.Conv2D(filters=6, kernel_size=(5,5), activation='relu', input_shape=(28,28,6)),
     # S4
-    tf.keras.layers.AveragePooling2D(pool_size=(2, 2), strides=None, padding='valid', data_format=None,),
+    tf.keras.layers.AveragePooling2D(pool_size=(2, 2), strides=None, padding='valid', data_format=None),
     # Flatten
     tf.keras.layers.Flatten(),
     # C5
