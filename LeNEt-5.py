@@ -57,6 +57,7 @@ y_test = tensorflow.keras.utils.to_categorical(y_test, num_classes)
 # plt.show()
 # print(y_train[1])
 # LeNet-5 model
+# ==> need to add bias
 model = tf.keras.models.Sequential([
     # C1 (first layer)
     tf.keras.layers.Conv2D(filters=6, kernel_size=(5,5), activation='tanh',input_shape=(32,32,1)),
