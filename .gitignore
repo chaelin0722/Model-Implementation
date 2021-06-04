@@ -1,6 +1,6 @@
-catdpg/
-mask/
-logs/
+catdpg/*
+mask/*
+logs/*
 logs\fit\
 my_lenet_model.h5
 my_model.h5
