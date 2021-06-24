@@ -7,7 +7,7 @@ from tensorflow.keras.layers import Dropout, AveragePooling2D, Dense, Conv2D, Ma
     GlobalAveragePooling2D, Flatten
 from tensorflow.keras import Input
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
 
 def inception(x_input, filter_1, filter_3_R, filter_3, filter_5_R, filter_5, pool_proj):
