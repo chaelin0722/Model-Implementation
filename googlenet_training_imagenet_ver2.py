@@ -55,36 +55,6 @@ def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True, buffer_size=1
     )
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    print('dataset length :', len(dataset))
-    return dataset
-
-def _parse_example(example_string):
-    feature_description = {
-        'image/source_id': tf.io.FixedLenFeature([], tf.int64),
-        'image/filename': tf.io.FixedLenFeature([], tf.string),
-        'image/encoded': tf.io.FixedLenFeature([], tf.string)
-    }
-    feature_dict = tf.io.parse_single_example(example_string, feature_description)
-    feature_dict['image/encoded'] = tf.image.decode_image(feature_dict['image/encoded'],channels=3)    # 解码JPEG图片
-    feature_dict['image/encoded']  = tf.cast(feature_dict['image/encoded'] , tf.float32)
-    feature_dict['image/encoded'] = tf.image.resize_images(feature_dict['image/encoded'], [224, 224]) / 255.0
-    return feature_dict['image'], feature_dict['image/source_id']
-
-def read_record(tfrecord_file,batch_size, buffer_size=10000, shuffle=True):
-    raw_dataset = tf.data.TFRecordDataset(tfrecord_file)
-    raw_dataset = raw_dataset.repeat()
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(buffer_size=buffer_size)
-    dataset = raw_dataset.map(
-        _parse_tfrecord(),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE
-    )
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    return dataset
-
-
-
 
     return dataset
 
@@ -126,8 +96,6 @@ def main():
 
     train_dataset = load_tfrecord_dataset(train_url,128)
     val_dataset = load_tfrecord_dataset(val_url,128)
-
-
 
     ## INPUT = 244 X 244, RGB channel
     input_data = Input(shape=(224, 224, 3))
