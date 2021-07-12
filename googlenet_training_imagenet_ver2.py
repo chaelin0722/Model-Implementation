@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 from keras.utils import np_utils
 import math
-
+from keras.optimizers import SGD
 
 def _parse_tfrecord():
     def parse_tfrecord(tfrecord):
@@ -153,27 +153,35 @@ def main():
 
     outputs = Dense(1000, activation="softmax", name='main_classifier')(x)
 
-    # concat_output = tf.keras.layers.concatenate([outputs, ax1, ax2])
+    concat_output = tf.keras.layers.concatenate([outputs, ax1, ax2])
 
-    model = tf.keras.models.Model(inputs=input_data, outputs=[outputs, ax1, ax2], name='googlenet')
+    model = tf.keras.models.Model(inputs=input_data, outputs=concat_output, name='googlenet')
   # model.summary()
 
     ###
-    learning_rate = 0.0001
+    learning_rate = 0.001
     momentum = 0.9
 
-    optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
-    loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    # optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
+    # optimizer = SGD(momentum=0.9)
+    # optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    # optimizer = keras.optimizers.Adam(lr=learning_rate, epsilon=None, decay=0.0, amsgrad=False)
+    optimizer = keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=None, decay=0.0)
+
+    #loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    loss = tf.keras.losses.sparse_categorical_crossentropy
+   # loss = tf.keras.losses.CategoricalCrossentropy( from_logits=False, label_smoothing=0, reduction="auto", name="categorical_crossentropy", )
+
+
 
     model.compile(optimizer=optimizer,
-                   loss={'main_classifier' : 'categorical_crossentropy',
-                         'ax1' : 'categorical_crossentropy',
-                         'ax2' : 'categorical_crossentropy'},
-                   loss_weights={'main_classifier' : 1.0,
-                                'ax1' : 0.3,
-                                'ax2' : 0.3},
+                   loss={'main_classifier' : loss,
+                         'ax1' : loss,
+                         'ax2' : loss},
+                   loss_weights={'main_classifier': 0.9,
+                         'ax1': 0.3,
+                         'ax2': 0.3},
                    metrics=['accuracy'])
-
 
     checkpoint_path = "checkpoints/cp.ckpt"
     checkpoint_dir = os.path.dirname(checkpoint_path)
@@ -195,13 +203,7 @@ def main():
     steps_per_epoch = int(train_count/BATCH_SIZE)
     validation_steps = int(val_count/BATCH_SIZE)
 
-
-    model.fit(train_dataset,
-              {'main_classifier' : train_dataset,
-               'ax1' : train_dataset,
-               'ax2' : train_dataset},
-              epochs=50, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
-
+    model.fit(train_dataset, epochs=50, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
 
     #모델 저장하기
     model.save('my_googLeNet.h5')

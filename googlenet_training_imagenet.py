@@ -55,37 +55,6 @@ def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True, buffer_size=1
     )
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    print('dataset length :', len(dataset))
-    return dataset
-
-def _parse_example(example_string):
-    feature_description = {
-        'image/source_id': tf.io.FixedLenFeature([], tf.int64),
-        'image/filename': tf.io.FixedLenFeature([], tf.string),
-        'image/encoded': tf.io.FixedLenFeature([], tf.string)
-    }
-    feature_dict = tf.io.parse_single_example(example_string, feature_description)
-    feature_dict['image/encoded'] = tf.image.decode_image(feature_dict['image/encoded'],channels=3)    # 解码JPEG图片
-    feature_dict['image/encoded']  = tf.cast(feature_dict['image/encoded'] , tf.float32)
-    feature_dict['image/encoded'] = tf.image.resize_images(feature_dict['image/encoded'], [224, 224]) / 255.0
-    return feature_dict['image'], feature_dict['image/source_id']
-
-def read_record(tfrecord_file,batch_size, buffer_size=10000, shuffle=True):
-    raw_dataset = tf.data.TFRecordDataset(tfrecord_file)
-    raw_dataset = raw_dataset.repeat()
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(buffer_size=buffer_size)
-    dataset = raw_dataset.map(
-        _parse_tfrecord(),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE
-    )
-    dataset = dataset.batch(batch_size)
-    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    return dataset
-
-
-
-
     return dataset
 
 
@@ -158,7 +127,7 @@ def main():
     ax1 = Flatten()(ax1)
     ax1 = Dense(1024, activation="relu")(ax1)  ## FC
     ax1 = Dropout(0.7)(ax1)
-    ax1 = Dense(1000, activation="softmax")(ax1)  ## FC
+    ax1 = Dense(1000, activation="softmax", name='ax1')(ax1)  ## FC
 
     x = inception(x, 160, 112, 224, 24, 64, 64)
     x = inception(x, 128, 128, 256, 24, 64, 64)
@@ -170,7 +139,7 @@ def main():
     ax2 = Flatten()(ax2)
     ax2 = Dense(1024, activation="relu")(ax2)  ## FC
     ax2 = Dropout(0.7)(ax2)
-    ax2 = Dense(1000, activation="softmax")(ax2)  ## FC
+    ax2 = Dense(1000, activation="softmax", name='ax2')(ax2)  ## FC
 
     x = inception(x, 256, 160, 320, 32, 128, 128)
 
@@ -183,7 +152,7 @@ def main():
     x = GlobalAveragePooling2D()(x)
     x = Dropout(0.4)(x)
 
-    outputs = Dense(1000, activation="softmax")(x)
+    outputs = Dense(1000, activation="softmax", name='main_classifier')(x)
 
     concat_output = tf.keras.layers.concatenate([outputs, ax1, ax2])
 
@@ -197,8 +166,15 @@ def main():
     optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
     loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-    model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
-
+    #model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
+    model.compile(optimizer=optimizer,
+                   loss={'main_classifier' : loss,
+                         'ax1' : loss,
+                         'ax2' : loss},
+                   loss_weights={'main_classifier': 1.0,
+                         'ax1': 0.3,
+                         'ax2': 0.3},
+                   metrics=['accuracy'])
 
     checkpoint_path = "checkpoints/cp.ckpt"
     checkpoint_dir = os.path.dirname(checkpoint_path)
