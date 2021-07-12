@@ -198,8 +198,8 @@ def main():
 
     model.fit(train_dataset,
               {'main_classifier' : train_dataset,
-               'auxiliary_4a' : train_dataset,
-               'auxiliary_4d' : train_dataset},
+               'ax1' : train_dataset,
+               'ax2' : train_dataset},
               epochs=50, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
 
 
