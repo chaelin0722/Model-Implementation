@@ -1,5 +1,3 @@
-catdpg/*
-mask/*
 logs/*
 logs\fit\
 my_lenet_model.h5
@@ -10,7 +8,9 @@ content/
 .ipynb_checkpoints/
 my_Alexnet.h5
 my_model0604.h5
-tfrecords/.*
-*.tfrecord
-logs/*
+tfrecords/*
 checkpoints/*
+*.tfrecord
+
+
+
