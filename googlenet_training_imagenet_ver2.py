@@ -83,7 +83,7 @@ def inception(x_input, filter_1, filter_3_R, filter_3, filter_5_R, filter_5, poo
 
 ###
 def decay(epoch, steps=100):
-    initial_lrate = 0.0001
+    initial_lrate = 0.00001
     drop = 0.96
     epoch_drop = 8
     lrate = initial_lrate * math.pow(drop, math.floor((1 + epoch) / epoch_drop))
@@ -150,27 +150,30 @@ def main():
 
     x = GlobalAveragePooling2D()(x)
     x = Dropout(0.4)(x)
+    ## add
+    add = Dense(1000, activation='relu')(x)
 
-    outputs = Dense(1000, activation="softmax", name='main_classifier')(x)
+    outputs = Dense(1000, activation="softmax", name='main_classifier')(add)
 
-    concat_output = tf.keras.layers.concatenate([outputs, ax1, ax2])
+    # concat_output = tf.keras.layers.concatenate([outputs, ax1, ax2])
 
-    model = tf.keras.models.Model(inputs=input_data, outputs=concat_output, name='googlenet')
+    model = tf.keras.models.Model(inputs=input_data, outputs=[outputs, ax1, ax2], name='googlenet')
   # model.summary()
 
     ###
-    learning_rate = 0.001
+    learning_rate = 0.1
     momentum = 0.9
 
-    # optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
+    #optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
+    optimizer = tf.keras.optimizers.SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
     # optimizer = SGD(momentum=0.9)
-    # optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    # optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.00001, amsgrad=False)
     # optimizer = keras.optimizers.Adam(lr=learning_rate, epsilon=None, decay=0.0, amsgrad=False)
-    optimizer = keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=None, decay=0.0)
+    # optimizer = keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=None, decay=0.0)
 
-    #loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-    loss = tf.keras.losses.sparse_categorical_crossentropy
-   # loss = tf.keras.losses.CategoricalCrossentropy( from_logits=False, label_smoothing=0, reduction="auto", name="categorical_crossentropy", )
+    # loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    # loss = tf.keras.losses.kl_divergence
+    loss = tf.keras.losses.CategoricalCrossentropy( from_logits=False, label_smoothing=0, reduction="auto", name="categorical_crossentropy", )
 
 
 
@@ -178,10 +181,11 @@ def main():
                    loss={'main_classifier' : loss,
                          'ax1' : loss,
                          'ax2' : loss},
-                   loss_weights={'main_classifier': 0.9,
+                   loss_weights={'main_classifier': 1.0,
                          'ax1': 0.3,
                          'ax2': 0.3},
-                   metrics=['accuracy'])
+                  metrics=['acc'])
+
 
     checkpoint_path = "checkpoints/cp.ckpt"
     checkpoint_dir = os.path.dirname(checkpoint_path)

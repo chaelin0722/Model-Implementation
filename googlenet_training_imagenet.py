@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 from keras.utils import np_utils
 import math
+from keras.optimizers import SGD
 
 
 def _parse_tfrecord():
@@ -163,18 +164,12 @@ def main():
     learning_rate = 0.0001
     momentum = 0.9
 
-    optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
-    loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+    #optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
+    sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
+
 
     #model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
-    model.compile(optimizer=optimizer,
-                   loss={'main_classifier' : loss,
-                         'ax1' : loss,
-                         'ax2' : loss},
-                   loss_weights={'main_classifier': 1.0,
-                         'ax1': 0.3,
-                         'ax2': 0.3},
-                   metrics=['accuracy'])
+    model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy', metrics=['acc'])
 
     checkpoint_path = "checkpoints/cp.ckpt"
     checkpoint_dir = os.path.dirname(checkpoint_path)
