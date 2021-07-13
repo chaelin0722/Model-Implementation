@@ -11,6 +11,6 @@ my_model0604.h5
 tfrecords/*
 checkpoints/*
 *.tfrecord
-
+*.h5
 
 
