@@ -6,12 +6,12 @@ from tensorflow.keras.layers import Dropout, AveragePooling2D, Dense, Conv2D, Ma
 from tensorflow.keras import Input
 import keras
 import tensorflow as tf
+from functools import partial
 import tensorflow.keras
 import numpy as np
-from PIL import Image
-from keras.utils import np_utils
-import math
 from keras.optimizers import SGD
+from keras import backend as K
+from keras.callbacks import ModelCheckpoint
 
 def _parse_tfrecord():
     def parse_tfrecord(tfrecord):
@@ -43,12 +43,20 @@ def _transform_images():
 def _transform_targets(y_train):
     return y_train
 
-def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True, buffer_size=1000):
+def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True):
     """load dataset from tfrecord"""
-    raw_dataset = tf.data.TFRecordDataset(tfrecord_name)
+    #raw_dataset = tf.data.TFRecordDataset(tfrecord_name)
+    raw_dataset = tf.data.Dataset.list_files(tfrecord_name)
+
+    raw_dataset = raw_dataset.interleave(tf.data.TFRecordDataset,
+                                 num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                                 deterministic=False)
+
     raw_dataset = raw_dataset.repeat()
+
     if shuffle:
-        raw_dataset = raw_dataset.shuffle(buffer_size=buffer_size)
+        raw_dataset = raw_dataset.shuffle(buffer_size=1024)
+
     dataset = raw_dataset.map(
         _parse_tfrecord(),
         num_parallel_calls=tf.data.experimental.AUTOTUNE
@@ -81,13 +89,6 @@ def inception(x_input, filter_1, filter_3_R, filter_3, filter_5_R, filter_5, poo
     return inception_result
 
 
-###
-def decay(epoch, steps=100):
-    initial_lrate = 0.0001
-    drop = 0.96
-    epoch_drop = 8
-    lrate = initial_lrate * math.pow(drop, math.floor((1 + epoch) / epoch_drop))
-    return lrate
 
 def main():
 
@@ -96,6 +97,8 @@ def main():
 
     train_dataset = load_tfrecord_dataset(train_url,128)
     val_dataset = load_tfrecord_dataset(val_url,128)
+
+
 
     ## INPUT = 244 X 244, RGB channel
     input_data = Input(shape=(224, 224, 3))
@@ -153,57 +156,48 @@ def main():
 
     outputs = Dense(1000, activation="softmax", name='main_classifier')(x)
 
-    concat_output = tf.keras.layers.concatenate([outputs, ax1, ax2])
+    concat_output = tf.keras.layers.concatenate([outputs*1.0, ax1*0.3, ax2*0.3])
 
     model = tf.keras.models.Model(inputs=input_data, outputs=concat_output, name='googlenet')
   # model.summary()
 
     ###
-    learning_rate = 0.001
+    learning_rate = 0.0001
     momentum = 0.9
 
-    # optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
-    # optimizer = SGD(momentum=0.9)
-    # optimizer = keras.optimizers.Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    # optimizer = keras.optimizers.Adam(lr=learning_rate, epsilon=None, decay=0.0, amsgrad=False)
-    optimizer = keras.optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=None, decay=0.0)
+    #optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
+    sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
 
-    #loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-    loss = tf.keras.losses.sparse_categorical_crossentropy
-   # loss = tf.keras.losses.CategoricalCrossentropy( from_logits=False, label_smoothing=0, reduction="auto", name="categorical_crossentropy", )
+    # top 5
+    top5_acc = partial(keras.metrics.top_k_categorical_accuracy, k=5)
+    top5_acc.__name__ = 'top5_acc'
 
+    model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy', metrics=["accuracy", top5_acc])
 
+    EPOCH = 100
+    BATCH_SIZE = 128
 
-    model.compile(optimizer=optimizer,
-                   loss={'main_classifier' : loss,
-                         'ax1' : loss,
-                         'ax2' : loss},
-                   loss_weights={'main_classifier': 0.9,
-                         'ax1': 0.3,
-                         'ax2': 0.3},
-                   metrics=['accuracy'])
+    filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-001.h5'.format(EPOCH, BATCH_SIZE)
 
-    checkpoint_path = "checkpoints/cp.ckpt"
-    checkpoint_dir = os.path.dirname(checkpoint_path)
     # 모델의 가중치를 저장하는 콜백 만들기
-
-
     callbacks = [
+            # tensorboard
             tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=True),
-            tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                             save_weights_only=True,
-                                                             verbose=1)
+            # 개선된 validation score를 도출해낼 때마다 weight를 중간 저장
+            ModelCheckpoint(filepath=filename,
+                             save_weights_only=True,
+                             verbose=1,  # 로그를 출력
+                             save_best_only=True,  # 가장 best 값만 저장
+                             mode='auto')  # auto는 알아서 best를 찾습니다. min/max
     ]
 
-    val_count = 500 #len(val_dataset)
-    train_count = 1000 # len(train_dataset)# len(train_dataset)
 
 
-    BATCH_SIZE = 32
-    steps_per_epoch = int(train_count/BATCH_SIZE)
-    validation_steps = int(val_count/BATCH_SIZE)
 
-    model.fit(train_dataset, epochs=50, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
+    steps_per_epoch = int(1231167/BATCH_SIZE)
+    validation_steps = int(50000 /BATCH_SIZE)
+
+    model.fit(train_dataset, validation_data=val_dataset, validation_steps=validation_steps, epochs=EPOCH, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
 
     #모델 저장하기
     model.save('my_googLeNet.h5')
@@ -211,7 +205,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 
 
