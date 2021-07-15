@@ -7,7 +7,7 @@ from tensorflow.keras import Input
 import keras
 import tensorflow as tf
 from functools import partial
-import tensorflow.keras
+from tensorflow import keras
 import numpy as np
 from keras.optimizers import SGD
 from keras import backend as K
@@ -95,8 +95,8 @@ def main():
     train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train.tfrecord"
     val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val.tfrecord"
 
-    train_dataset = load_tfrecord_dataset(train_url,128)
-    val_dataset = load_tfrecord_dataset(val_url,128)
+    train_dataset = load_tfrecord_dataset(train_url,64)
+    val_dataset = load_tfrecord_dataset(val_url,64)
 
 
 
@@ -160,7 +160,6 @@ def main():
 
     model = tf.keras.models.Model(inputs=input_data, outputs=concat_output, name='googlenet')
   # model.summary()
-
     ###
     learning_rate = 0.0001
     momentum = 0.9
@@ -168,18 +167,17 @@ def main():
     #optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
     sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
 
-    # top 5
-    top5_acc = partial(keras.metrics.top_k_categorical_accuracy, k=5)
-    top5_acc.__name__ = 'top5_acc'
+    model.load_weights('checkpoints/checkpoint-epoch-100-batch-64-trial-001.h5') # epoch 14
 
-    model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy', metrics=["accuracy", top5_acc])
+    model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy', metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
-    EPOCH = 100
-    BATCH_SIZE = 128
+    EPOCH = 86
+    BATCH_SIZE = 64
 
-    filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-001.h5'.format(EPOCH, BATCH_SIZE)
+    filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-002.h5'.format(EPOCH, BATCH_SIZE) # from epoch 14  maybe
 
-    # 모델의 가중치를 저장하는 콜백 만들기
+
+    # 모델의 가중치를 저장하는 콜백
     callbacks = [
             # tensorboard
             tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=True),
