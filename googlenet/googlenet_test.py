@@ -1,70 +1,45 @@
-import matplotlib
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-import random
 from PIL import Image
-import cv2
+import os, glob
+import numpy as np
+from keras.models import load_model
 
 
-dir = '/home/ivpl-d14/PycharmProjects/imagenet/imagenet/test/zucchini'
-files = os.listdir(dir)
-file_dir = []
-image = []
-image_arr = []
-for i in range (4):
-    single_file = random.choice(files)
-    file_dir.append(os.path.join(dir, single_file))
-    image = Image.open(file_dir[i])
-    image_arr = np.array(image)
-
-###
-
-rows = 2
-cols = 2
-
-fig = plt.figure()
+image_dir = "/home/ivpl-d14/PycharmProjects/imagenet/imagenet/test_4classes"
+image_w = 244
+image_h = 244
 
 
-for num in range(4):  # num1 ~ num5
-    i = 1
-    ax = fig.add_subplot(rows, cols, i)
-    ax.imshow(image_arr[i])
-    ax.set_xlabel(num)
-    ax.set_xticks([]), ax.set_yticks([])
-    i+=1
+X = []
+filenames = []
+files = glob.glob(image_dir+"/*.JPEG")
+for i, f in enumerate(files):
+    img = Image.open(f)
+    img = img.convert("RGB")
+    img = img.resize((image_w, image_h))
+    data = np.asarray(img)
+    filenames.append(f)
+    X.append(data)
 
-fig.tight_layout()  # setting blanks between images
-plt.show()
+X = np.array(X)
+model = load_model('../my_googLeNet.h5')
+
+prediction = model.predict(X)
+np.set_printoptions(formatter={'float': lambda x: "{0:0.1f}".format(x)})
+cnt = 0
 
 
-
-
-'''
-dir = '/home/ivpl-d14/PycharmProjects/imagenet/imagenet/test/zucchini/*.JPEG'
-##
-def read_img(file_path):
-    img_arr = cv2.imread(file_path)
-    return cv2.cvtColor(img_arr, cv2.COLOR_BGR2RGB)
-
-img_arrs = []
-img_num = range(0,50)
-
-for i in random.sample(img_num, 4):
-    img_arrs.append(read_img(dir[i]))
-
-rows = 2
-cols = 2
-
-fig, axes = plt.subplots(nrows=rows, ncols=cols, figsize=(cols*2, rows*2))
-
-for num in range(1, rows*cols+1):  # num1 ~ num5
-    fig.add_subplot(rows, cols, num)
-    idx = num-1 # setting index
-
-    plt.imshow(img_arrs[idx], aspect="auto")
-    plt.xlabel(f'{img_arrs[idx].shape}', fontsize=12)
-
-fig.tight_layout()  # setting blanks between images
-'''
+for i in prediction:
+    pre_ans = i.argmax()  # 예측 레이블
+    print(i)
+    print(pre_ans)
+    pre_ans_str = ''
+    if pre_ans == 270: pre_ans_str = "wood_rabbit"
+    elif pre_ans == 954: pre_ans_str = "warplane"
+    elif pre_ans == 284: pre_ans_str = "wolf_spider"
+    else: pre_ans_str = "african_chameleon"
+    if i[0] >= 0.8 : print(filenames[cnt].split("/")[1]+"image is predicted as "+pre_ans_str)
+    if i[1] >= 0.8 : print(filenames[cnt].split("/")[1]+"image is predicted as "+pre_ans_str)
+    if i[2] >= 0.8 : print(filenames[cnt].split("/")[1]+"image is predicted as "+pre_ans_str)
+    if i[3] >= 0.8 : print(filenames[cnt].split("/")[1]+"image is predicted as "+pre_ans_str)
+    cnt += 1
 
