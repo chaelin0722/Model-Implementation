@@ -34,14 +34,19 @@ def make_example(img_str, source_id, filename):
 def main(dataset_path, output_path):
     samples = []
     print("Reading data list...")
-    for id_name in tqdm(os.listdir(dataset_path)):
-        img_paths = glob(os.path.join(dataset_path, id_name, '*.jpg'))
-        for img_path in img_paths:
-            filename = os.path.join(id_name, os.path.basename(img_path))
-            samples.append((img_path, id_name, filename))
-    random.shuffle(samples)
 
+    i = 1
+    for id_name in tqdm(os.listdir(dataset_path)):
+        img_paths = glob(os.path.join(dataset_path, id_name, '*.JPEG'))
+        print("img_path:",img_paths)
+        for img_path in img_paths:
+            filename = os.path.join(str(i), os.path.basename(img_path))
+            samples.append((img_path, str(i) , filename))
+        i = i+1
+
+    random.shuffle(samples)
     print("Writing tfrecord file...")
+
     with tf.io.TFRecordWriter(output_path) as writer:
         for img_path, id_name, filename in tqdm(samples):
             tf_example = make_example(img_str=open(img_path, 'rb').read(),
@@ -49,8 +54,7 @@ def main(dataset_path, output_path):
                                       filename=str.encode(filename))
             writer.write(tf_example.SerializeToString())
 
-
 if __name__ == "__main__":
-    dataset_path = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/catdog/training_set/training_set/"
-    output_path = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/"
+    dataset_path = "/home/ivpl-d14/PycharmProjects/imagenet/imagenet/test"
+    output_path = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/0715test.tfrecord"
     main(dataset_path, output_path)

@@ -1,16 +1,9 @@
-
-import os
-import numpy as np
+import datetime
 from tensorflow.keras.layers import Dropout, AveragePooling2D, Dense, Conv2D, MaxPooling2D, Activation, Concatenate, \
     GlobalAveragePooling2D, Flatten
 from tensorflow.keras import Input
-import keras
 import tensorflow as tf
-from functools import partial
-from tensorflow import keras
-import numpy as np
 from keras.optimizers import SGD
-from keras import backend as K
 from keras.callbacks import ModelCheckpoint
 
 def _parse_tfrecord():
@@ -83,7 +76,7 @@ def inception(x_input, filter_1, filter_3_R, filter_3, filter_5_R, filter_5, poo
 
     x4 = Conv2D(filters=filter_1, kernel_size=(1, 1), padding="SAME", activation='relu')(x_input)
 
-    # COncatenate each layers' depth
+    # Concatenate each layers' depth
     inception_result = Concatenate()([x1, x2, x3, x4])
 
     return inception_result
@@ -167,20 +160,23 @@ def main():
     #optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
     sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
 
-    model.load_weights('checkpoints/checkpoint-epoch-100-batch-64-trial-001.h5') # epoch 14
+    model.load_weights('checkpoints/checkpoint-epoch-86-batch-64-trial-002.h5') # epoch 14
 
     model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy', metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
-    EPOCH = 86
+    EPOCH = 100  #EPOCH=20
     BATCH_SIZE = 64
 
     filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-002.h5'.format(EPOCH, BATCH_SIZE) # from epoch 14  maybe
+        # 'googlenet/checkpoints/checkpoint-epoch-{}-batch-{}-trial-003.h5'.format(EPOCH, BATCH_SIZE)
+    log_dir = "./logs/fit/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
+    # tensorboard
 
     # 모델의 가중치를 저장하는 콜백
     callbacks = [
-            # tensorboard
-            tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=True),
+
+            tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1),
             # 개선된 validation score를 도출해낼 때마다 weight를 중간 저장
             ModelCheckpoint(filepath=filename,
                              save_weights_only=True,
@@ -190,15 +186,14 @@ def main():
     ]
 
 
-
-
     steps_per_epoch = int(1231167/BATCH_SIZE)
     validation_steps = int(50000 /BATCH_SIZE)
 
-    model.fit(train_dataset, validation_data=val_dataset, validation_steps=validation_steps, epochs=EPOCH, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
-
+    model.fit(train_dataset, validation_data=val_dataset, validation_steps=validation_steps,
+              initial_epoch=12, epochs=EPOCH, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
+                ##initial_epoch=100,
     #모델 저장하기
-    model.save('my_googLeNet.h5')
+    model.save('my_googLeNet.h5')  #my_googLeNet_MORE_EPOCHS.h5
 
 
 if __name__ == '__main__':
