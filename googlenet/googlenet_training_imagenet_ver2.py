@@ -160,18 +160,17 @@ def main():
     #optimizer = tf.keras.optimizers.SGD(lr=learning_rate, momentum=momentum, nesterov=False)
     sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
 
-    model.load_weights('checkpoints/checkpoint-epoch-86-batch-64-trial-002.h5') # epoch 14
+    model.load_weights('checkpoints/checkpoint-epoch-100-batch-64-trial-002.h5') # epoch 14
 
     model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy', metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
-    EPOCH = 100  #EPOCH=20
+    EPOCH = 110  #EPOCH=100
     BATCH_SIZE = 64
 
-    filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-002.h5'.format(EPOCH, BATCH_SIZE) # from epoch 14  maybe
-        # 'googlenet/checkpoints/checkpoint-epoch-{}-batch-{}-trial-003.h5'.format(EPOCH, BATCH_SIZE)
+    #filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-002.h5'.format(EPOCH, BATCH_SIZE)
+    filename =  'checkpoints/checkpoint-epoch-{}-batch-{}-trial-003.h5'.format(EPOCH, BATCH_SIZE)
     log_dir = "./logs/fit/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    # tensorboard
 
     # 모델의 가중치를 저장하는 콜백
     callbacks = [
@@ -190,10 +189,10 @@ def main():
     validation_steps = int(50000 /BATCH_SIZE)
 
     model.fit(train_dataset, validation_data=val_dataset, validation_steps=validation_steps,
-              initial_epoch=12, epochs=EPOCH, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
+              initial_epoch=100, epochs=EPOCH, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
                 ##initial_epoch=100,
     #모델 저장하기
-    model.save('my_googLeNet.h5')  #my_googLeNet_MORE_EPOCHS.h5
+    model.save('my_googLeNet_MORE_EPOCHS.h5')  #my_googLeNet_MORE_EPOCHS.h5
 
 
 if __name__ == '__main__':

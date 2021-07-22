@@ -1,4 +1,4 @@
-logs/*
+googlenet/logs/*
 logs\fit\
 my_lenet_model.h5
 my_model.h5
@@ -9,7 +9,7 @@ content/
 my_Alexnet.h5
 my_model0604.h5
 tfrecords/*
-checkpoints/*
+googlenet/checkpoints/*
 *.tfrecord
 *.h5
 

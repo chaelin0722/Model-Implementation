@@ -177,12 +177,12 @@ def main():
 
     model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy', metrics=["accuracy", top5_acc])
 
-    checkpoint_path = "checkpoints/cp.ckpt"
+    checkpoint_path = "googlenet/checkpoints/cp.ckpt"
     #checkpoint_dir = os.path.dirname(checkpoint_path)
 
     # 모델의 가중치를 저장하는 콜백 만들기
     callbacks = [
-            tf.keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=True),
+            tf.keras.callbacks.TensorBoard(log_dir='googlenet/logs', histogram_freq=0, write_graph=True, write_images=True),
             tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                              save_weights_only=True,
                                                              verbose=1)
