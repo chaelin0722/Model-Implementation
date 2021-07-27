@@ -8,6 +8,26 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 import math
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try: # Currently, memory growth needs to be the same across GPUs
+        for gpu in gpus: tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+
+    except RuntimeError as e: # Memory growth must be set before GPUs have been initialized
+        print(e)
+
+'''
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus: # 텐서플로가 첫 번째 GPU에 1GB 메모리만 할당하도록 제한
+    try:
+        tf.config.experimental.set_virtual_device_configuration( gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)])
+    except RuntimeError as e: # 프로그램 시작시에 가상 장치가 설정되어야만 합니다
+        print(e)
+
+'''
+
 def _parse_tfrecord():
     def parse_tfrecord(tfrecord):
         features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
@@ -233,8 +253,8 @@ def main():
     train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train.tfrecord"
     val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val.tfrecord"
 
-    train_dataset = load_tfrecord_dataset(train_url,64)
-    val_dataset = load_tfrecord_dataset(val_url,64)
+    train_dataset = load_tfrecord_dataset(train_url,32)
+    val_dataset = load_tfrecord_dataset(val_url,32)
 
     # create inception-v4 model
     model = create_inception_v4()
@@ -242,7 +262,7 @@ def main():
     #model.summary()
 
     EPOCH = 100
-    BATCH_SIZE = 16
+    BATCH_SIZE = 32
 
     # decay every two epochs using exponential rate of 0.94
     def step_decay(epoch):
@@ -276,7 +296,6 @@ def main():
 
             tf.keras.callbacks.LearningRateScheduler(step_decay)
     ]
-
 
     steps_per_epoch = int(1231167/BATCH_SIZE)
     validation_steps = int(50000 /BATCH_SIZE)
