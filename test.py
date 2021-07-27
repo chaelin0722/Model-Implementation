@@ -9,3 +9,7 @@ i = 1
 #img_path = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train.tfrecord"
 
 #filename = os.path.join(str(i), os.path.basename(img_path))
+
+a = 'python'
+
+print(a[:-1])
