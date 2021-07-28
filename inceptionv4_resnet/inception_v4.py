@@ -254,7 +254,7 @@ def main():
     val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val.tfrecord"
 
     train_dataset = load_tfrecord_dataset(train_url,32)
-    val_dataset = load_tfrecord_dataset(val_url,32)
+    val_dataset = load_tfrecord_dataset(val_url, 32)
 
     # create inception-v4 model
     model = create_inception_v4()
@@ -266,18 +266,20 @@ def main():
 
     # decay every two epochs using exponential rate of 0.94
     def step_decay(epoch):
-        init_lr = 0.045
+        init_lr = 0.0001
         drop = 0.94
         epochs_drop = 2.0
         lrate = init_lr * math.pow(drop, math.floor((1 + epoch) / epochs_drop))
+        # to check on the tensorboard
+        tf.summary.scalar('learning rate', data=lrate, step=epoch)
 
         return lrate
 
 
     # decayed everyh two epochs using exponential rate of 0.94
-    rmsprop = tf.keras.optimizers.RMSprop(decay=0.9, momentum=0.9, epsilon=1.0)
+    # rmsprop = tf.keras.optimizers.RMSprop(decay=0.9, momentum=0.9, epsilon=1.0)
 
-    model.compile(optimizer=rmsprop, loss='sparse_categorical_crossentropy', metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
     filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-001.h5'.format(EPOCH, BATCH_SIZE)
     log_dir = "./logs/fit/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
