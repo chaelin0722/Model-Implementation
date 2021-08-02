@@ -13,4 +13,4 @@ googlenet/checkpoints/*
 *.tfrecord
 *.h5
 logs/*
-
+*/logs/*
