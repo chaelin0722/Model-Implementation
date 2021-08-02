@@ -8,6 +8,7 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 import math
 
+'''
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try: # Currently, memory growth needs to be the same across GPUs
@@ -18,7 +19,6 @@ if gpus:
     except RuntimeError as e: # Memory growth must be set before GPUs have been initialized
         print(e)
 
-'''
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus: # 텐서플로가 첫 번째 GPU에 1GB 메모리만 할당하도록 제한
     try:
@@ -48,8 +48,8 @@ def _transform_images():
         x_train = tf.image.resize(x_train, (299, 299))
         x_train = tf.image.random_crop(x_train, (299,299, 3))
         x_train = tf.image.random_flip_left_right(x_train)
-        x_train = tf.image.random_saturation(x_train, 0.6, 1.4)
-        x_train = tf.image.random_brightness(x_train, 0.4)
+#        x_train = tf.image.random_saturation(x_train, 0.6, 1.4)
+#        x_train = tf.image.random_brightness(x_train, 0.4)
         x_train = x_train / 255
         return x_train
     return transform_images
@@ -111,8 +111,8 @@ def stem(input):
     x_1 = conv_block(x_1, 96, 3, 3, padding='valid')
 
     x_2 = conv_block(x, 64, 1, 1)
-    x_2 = conv_block(x_2, 64, 1, 7)
     x_2 = conv_block(x_2, 64, 7, 1)
+    x_2 = conv_block(x_2, 64, 1, 7)
     x_2 = conv_block(x_2, 96, 3, 3, padding='valid')
 
     x = tf.keras.layers.concatenate([x_1, x_2])
@@ -146,13 +146,13 @@ def inception_a(input):
 def inception_b(input):
 
     b1 = conv_block(input, 192, 1, 1)
-    b1 = conv_block(b1, 192, 7, 1)
-    b1 = conv_block(b1, 224, 1, 7)
+    b1 = conv_block(b1, 192, 1, 7)
     b1 = conv_block(b1, 224, 7, 1)
-    b1 = conv_block(b1, 256, 1, 7)
+    b1 = conv_block(b1, 224, 1, 7)
+    b1 = conv_block(b1, 256, 7, 1)
 
     b2 = conv_block(input, 192, 1, 1)
-    b2 = conv_block(b2, 224, 7, 1)
+    b2 = conv_block(b2, 224, 1, 7)
     b2 = conv_block(b2, 256, 7, 1)
 
     b3 = conv_block(input, 384, 1, 1)
@@ -166,10 +166,10 @@ def inception_b(input):
 
 def inception_c(input):
     c1 = conv_block(input, 384, 1, 1)
-    c1 = conv_block(c1, 448, 3, 1)
-    c1 = conv_block(c1, 512, 1, 3)
-    c1_1 = conv_block(c1, 256, 3, 1)
-    c1_2 = conv_block(c1, 256, 1, 3)
+    c1 = conv_block(c1, 448, 1, 3)
+    c1 = conv_block(c1, 512, 3, 1)
+    c1_1 = conv_block(c1, 256, 1, 3)
+    c1_2 = conv_block(c1, 256, 3, 1)
 
     c2 = conv_block(input, 384, 1, 1)
     c2_1 = conv_block(c2, 256, 1, 3)
@@ -202,8 +202,8 @@ def reduction_a(input):
 def reduction_b(input):
 
     r1 = conv_block(input, 256, 1, 1)
-    r1 = conv_block(r1, 256, 7, 1)
-    r1 = conv_block(r1, 320, 1, 7)
+    r1 = conv_block(r1, 256, 1, 7)
+    r1 = conv_block(r1, 320, 7, 1)
     r1 = conv_block(r1, 320, 3, 3, strides=(2,2), padding='valid')
 
     r2 = conv_block(input, 192, 1, 1)
@@ -237,8 +237,11 @@ def create_inception_v4():
     for i in range(3):
         x = inception_c(x)
 
-    x = AveragePooling2D(pool_size=(8, 8), padding='valid')(x)
+    x = AveragePooling2D(pool_size=(8, 8), padding='valid')(x)  #1536
     x = Dropout(0.2)(x)
+
+    #    x = GlobalAveragePooling2D()(x)   #1536
+    #    x = Dropout(0.8)(x)
     x = Flatten()(x)
 
     output = Dense(1000, activation='softmax')(x)
@@ -275,9 +278,14 @@ def main():
 
         return lrate
 
-
     # decayed everyh two epochs using exponential rate of 0.94
     # rmsprop = tf.keras.optimizers.RMSprop(decay=0.9, momentum=0.9, epsilon=1.0)
+    rmsprop = tf.keras.optimizers.RMSprop(learning_rate=0.00001, decay=0.9, momentum=0.9, epsilon=1e-5)
+    # sgd = tf.keras.optimizers.SGD(lr=1., decay=0.01, momentum=0.9, nesterov=True)
+    sgd = tf.keras.optimizers.SGD(lr=0.0001, decay=0.9, momentum=0.9, nesterov=True)
+    # adam = tf.keras.optimizers.Adam(learning_rate=0.01)
+    # adadelta = tf.keras.optimizers.Adadelta(lr=0.0001, rho=0.95, epsilon=1.0, decay=0.001)
+    adamax = tf.keras.optimizers.Adamax(lr=0.002, beta_1=0.9, beta_2=0.999)
 
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
