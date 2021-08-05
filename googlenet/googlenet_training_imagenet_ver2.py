@@ -47,15 +47,15 @@ def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True):
 
     raw_dataset = raw_dataset.repeat()
 
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(buffer_size=1024)
 
     dataset = raw_dataset.map(
         _parse_tfrecord(),
         num_parallel_calls=tf.data.experimental.AUTOTUNE
     )
-    dataset = dataset.batch(batch_size)
+    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+
+    dataset = dataset.shuffle(buffer_size=10)
 
     return dataset
 
@@ -94,7 +94,7 @@ def main():
 
 
     ## INPUT = 244 X 244, RGB channel
-    input_data = Input(shape=(224, 224, 3))
+    input_data = Input((224, 224, 3))
 
     ################# PART 1 ######################
 
@@ -188,8 +188,8 @@ def main():
     steps_per_epoch = int(1231167/BATCH_SIZE)
     validation_steps = int(50000 /BATCH_SIZE)
 
-    model.fit(train_dataset, validation_data=val_dataset, validation_steps=validation_steps,
-              initial_epoch=100, epochs=EPOCH, batch_size=BATCH_SIZE,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
+    model.fit(train_dataset,  batch_size=BATCH_SIZE,validation_data=val_dataset, validation_steps=validation_steps,
+              initial_epoch=100, epochs=EPOCH,  steps_per_epoch=steps_per_epoch, callbacks=callbacks)
                 ##initial_epoch=100,
     #모델 저장하기
     model.save('my_googLeNet_MORE_EPOCHS.h5')  #my_googLeNet_MORE_EPOCHS.h5

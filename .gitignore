@@ -14,3 +14,5 @@ googlenet/checkpoints/*
 *.h5
 logs/*
 */logs/*
+logs2/*
+*/logs2.*

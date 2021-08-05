@@ -1,6 +1,6 @@
 import datetime
 from tensorflow.keras.layers import Dropout, AveragePooling2D, Dense, Conv2D, MaxPooling2D, Activation, Concatenate, \
-    GlobalAveragePooling2D, Flatten
+    GlobalAveragePooling2D, Flatten, MaxPool2D
 from tensorflow.keras import Input
 import tensorflow as tf
 from keras.optimizers import SGD
@@ -19,63 +19,88 @@ if gpus:
     except RuntimeError as e: # Memory growth must be set before GPUs have been initialized
         print(e)
 
-def _parse_tfrecord():
-    def parse_tfrecord(tfrecord):
-        features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
-                    'image/filename': tf.io.FixedLenFeature([], tf.string),
-                    'image/encoded': tf.io.FixedLenFeature([], tf.string)}
-        x = tf.io.parse_single_example(tfrecord, features)
 
-        x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
-        y_train = tf.cast(x['image/source_id'], tf.int64)
-        x_train = _transform_images()(x_train)
-        y_train = _transform_targets(y_train)
-        return (x_train, y_train), y_train
+def parse_tfrecord(tfrecord):
+    features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
+                'image/encoded': tf.io.FixedLenFeature([], tf.string)}
+    x = tf.io.parse_single_example(tfrecord, features)
 
-    return parse_tfrecord
+    x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
+    x_train = transform_images(x_train)
+    y_train = tf.cast(x['image/source_id'], tf.int64)
+    y_train = _transform_targets(y_train)
+
+    return x_train, y_train
 
 
-def _transform_images():
-    def transform_images(x_train):
-        ran_image_size = random.randint(256, 513)  # min 256 ~ 512 max
-        x_train = tf.image.resize(x_train, (ran_image_size, ran_image_size))
-        x_train = tf.image.random_crop(x_train, (224, 224, 3))
-        x_train = tf.image.random_flip_left_right(x_train)
-        x_train = tf.image.random_saturation(x_train, 0.6, 1.4)
-        x_train = tf.image.random_brightness(x_train, 0.4)
-        x_train = x_train / 255
-        return x_train
+def parse_tfrecord_no_transform(tfrecord):
 
-    return transform_images
+    features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
+                'image/encoded': tf.io.FixedLenFeature([], tf.string)}
+    x = tf.io.parse_single_example(tfrecord, features)
+
+    y_train = tf.cast(x['image/source_id'], tf.int64)
+    y_train = _transform_targets(y_train)
+    x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
+    x_train = tf.image.resize(x_train, (224, 224))
+    x_train = x_train / 255
+
+    return x_train, y_train
+
+
+def transform_images(x_train):
+    ran_image_size = random.randint(256, 513)  # min 256 ~ 512 max
+    x_train = tf.image.resize(x_train, (ran_image_size, ran_image_size))
+    x_train = tf.image.random_crop(x_train, (224, 224, 3))
+    x_train = tf.image.random_flip_left_right(x_train)
+    x_train = x_train / 255
+
+    '''
+    x_train = tf.image.resize(x_train, (224, 224))
+    x_train = tf.image.random_crop(x_train, (224,224, 3))
+    x_train = tf.image.random_flip_left_right(x_train)
+    x_train = tf.image.random_saturation(x_train, 0.6, 1.4)
+    x_train = tf.image.random_brightness(x_train, 0.4)
+    x_train = x_train / 255
+    '''
+
+    return x_train
 
 
 def _transform_targets(y_train):
     return y_train
 
+def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle):
 
-def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True):
     """load dataset from tfrecord"""
-    # raw_dataset = tf.data.TFRecordDataset(tfrecord_name)
-    raw_dataset = tf.data.Dataset.list_files(tfrecord_name)
+    raw_dataset = tf.data.Dataset.list_files(tfrecord_name, seed=42)
+    raw_dataset = tf.data.TFRecordDataset(raw_dataset)
 
+    '''
     raw_dataset = raw_dataset.interleave(tf.data.TFRecordDataset,
-                                         num_parallel_calls=tf.data.experimental.AUTOTUNE,
-                                         deterministic=False)
+                                 num_parallel_calls=tf.data.experimental.AUTOTUNE,
+                                 deterministic=False)
+    '''
 
-    raw_dataset = raw_dataset.repeat()
-
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(buffer_size=1024)
-
-    dataset = raw_dataset.map(
-        _parse_tfrecord(),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE
-    )
-    dataset = dataset.batch(batch_size)
+    if shuffle is True:
+        dataset = raw_dataset.map(
+            parse_tfrecord,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
+    elif shuffle is False:
+        dataset = raw_dataset.map(
+            parse_tfrecord_no_transform,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
+    dataset = dataset.repeat()
+    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-    return dataset
+    if shuffle is True:
+        dataset = dataset.shuffle(buffer_size=10)
 
+
+    return dataset
 
 
 def main():
@@ -86,7 +111,6 @@ def main():
     x = Conv2D(filters=64, kernel_size=(3, 3), padding="SAME", activation='relu',kernel_regularizer=regularizers.l2(0.0005))(x)
     x = MaxPooling2D(pool_size=(2, 2), strides=(2, 2))(x)
 
-    x = Conv2D(filters=128, kernel_size=(3, 3), padding="SAME", activation='relu',kernel_regularizer=regularizers.l2(0.0005))(x)
     x = Conv2D(filters=128, kernel_size=(3, 3), padding="SAME", activation='relu',kernel_regularizer=regularizers.l2(0.0005))(x)
     x = Conv2D(filters=128, kernel_size=(3, 3), padding="SAME", activation='relu',kernel_regularizer=regularizers.l2(0.0005))(x)
     x = MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding="SAME")(x)
@@ -116,21 +140,21 @@ def main():
     output = Dense(1000, activation="softmax")(x) #, kernel_regularizer=regularizers.l2(0.001))(x)
 
     model = Model(inputs=input_data, outputs=output, name='vgg-16')
-    # model.summary()
+    #model.summary()
 
-    train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train.tfrecord"
-    val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val.tfrecord"
 
-    train_dataset = load_tfrecord_dataset(train_url, 32)
-    val_dataset = load_tfrecord_dataset(val_url, 32)
+    train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train2.tfrecord"
+    val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val2.tfrecord"
+    train_dataset = load_tfrecord_dataset(train_url, 8, shuffle=True)
+    val_dataset = load_tfrecord_dataset(val_url, 8, shuffle=False)
 
 
     EPOCH = 100
-    BATCH_SIZE = 32
+    BATCH_SIZE = 8
 
-    adam = tf.keras.optimizers.Adam(learning_rate=0.0001, decay=0.0005)
+    adam = tf.keras.optimizers.Adam(learning_rate=0.0001, decay=0.9)
     # sgd = tf.keras.optimizers.SGD(lr=0.00001, decay=0.01, momentum=0.9, nesterov=True)
-    sgd = SGD(lr=0.002, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(lr=0.00001, decay=1e-6, momentum=0.9, nesterov=True)
     optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=0.001)
     model.compile(optimizer=adam, loss='sparse_categorical_crossentropy',
                   metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
@@ -153,9 +177,13 @@ def main():
     steps_per_epoch = int(1231167 / BATCH_SIZE)
     validation_steps = int(50000 / BATCH_SIZE)
 
-    model.fit(train_dataset, validation_data=val_dataset, validation_steps=validation_steps,
-              epochs=EPOCH, batch_size=BATCH_SIZE, steps_per_epoch=steps_per_epoch, callbacks=callbacks)
-    ##initial_epoch=100,
+
+
+    model.fit(train_dataset, validation_data=val_dataset,
+              validation_steps=validation_steps,
+              epochs=EPOCH, batch_size=BATCH_SIZE,
+              steps_per_epoch=steps_per_epoch,
+              callbacks=callbacks)
 
     # 모델 저장
     model.save('my_vgg_16.h5')

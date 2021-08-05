@@ -18,56 +18,50 @@ if gpus:
     except RuntimeError as e: # Memory growth must be set before GPUs have been initialized
         print(e)
 
-def _parse_tfrecord():
-    def parse_tfrecord(tfrecord):
-        features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
-                    'image/filename': tf.io.FixedLenFeature([], tf.string),
-                    'image/encoded': tf.io.FixedLenFeature([], tf.string)}
-        x = tf.io.parse_single_example(tfrecord, features)
 
-        x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
-        y_train = tf.cast(x['image/source_id'], tf.int64)
-        x_train = _transform_images()(x_train)
-        y_train = _transform_targets(y_train)
-        return (x_train, y_train), y_train
-    return parse_tfrecord
+EPOCH = 100
+BATCH_SIZE = 32
 
+# tfrecord decode
+def parse_image(record):
+    features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
+                'image/encoded': tf.io.FixedLenFeature([], tf.string)
+    }
+    parsed_record = tf.io.parse_single_example(record, features)
+    label= tf.cast(parsed_record['image/source_id'], tf.int32)
 
-def _transform_images():
-    def transform_images(x_train):
-        ran_image_size = random.randint(256, 513)  # min 256 ~ 512 max
-        x_train = tf.image.resize(x_train, (ran_image_size, ran_image_size))
-        x_train = tf.image.random_crop(x_train, (224, 224, 3))
-        x_train = x_train / 255
-        return x_train
-    return transform_images
+#    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = tf.image.decode_jpeg(parsed_record['image/encoded'], channels=3)
+    return image, label
 
+# train dataloader (augmentation)
+def get_dataset_train(path, batch_size=BATCH_SIZE):
+    dataset = tf.data.Dataset.list_files(path, seed=42)    # seed: shuffle
 
-def _transform_targets(y_train):
-    return y_train
+    dataset = tf.data.TFRecordDataset(filenames=dataset, compression_type="GZIP")
+    dataset = dataset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    # dataset = < ParallelMapDataset shapes: ((None, None, 3), ()), types: (tf.uint8, tf.int32) >
+    # Data Agumentation
+    dataset = dataset.map(lambda image, label : (tf.image.random_flip_left_right(image), label), num_parallel_calls=tf.data.experimental.AUTOTUNE)             # flip
+    dataset = dataset.map(lambda image, label: (tf.image.random_crop(image, size=[224, 224, 3]), label), num_parallel_calls=tf.data.experimental.AUTOTUNE)     # crop
+    dataset = dataset.repeat()
+    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.shuffle(buffer_size=10)
 
-def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True):
-    """load dataset from tfrecord"""
-    #raw_dataset = tf.data.TFRecordDataset(tfrecord_name)
-    raw_dataset = tf.data.Dataset.list_files(tfrecord_name)
+    return dataset
 
-    raw_dataset = raw_dataset.interleave(tf.data.TFRecordDataset,
-                                 num_parallel_calls=tf.data.experimental.AUTOTUNE,
-                                 deterministic=False)
-
-    raw_dataset = raw_dataset.repeat()
-
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(buffer_size=1024)
-
-    dataset = raw_dataset.map(
-        _parse_tfrecord(),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE
-    )
-    dataset = dataset.batch(batch_size)
+# val or test dataloader (no augmentation)
+def get_dataset_val(path, batch_size=BATCH_SIZE):
+    dataset = tf.data.Dataset.list_files(path, seed=42)
+    dataset = tf.data.TFRecordDataset(filenames=dataset, compression_type="GZIP")
+    dataset = dataset.map(parse_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.map(lambda image, label: (tf.image.resize_with_pad(image, 224, 224), label), num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     return dataset
+
 
 def create_vgg_16():
 
@@ -110,24 +104,22 @@ def create_vgg_16():
 
 def main():
 
-    train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train.tfrecord"
-    val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val.tfrecord"
+    train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train2.tfrecord"
+    val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val2.tfrecord"
 
-    train_dataset = load_tfrecord_dataset(train_url, 64)
-    val_dataset = load_tfrecord_dataset(val_url, 64)
+    train_dataset = get_dataset_train(train_url)
+    val_dataset = get_dataset_val(val_url)
 
     model = create_vgg_16()
     #model.summary()
 
-    EPOCH = 100
-    BATCH_SIZE = 64
 
 
-   # adam = tf.keras.optimizers.Adam(learning_rate=0.000001, decay=0.9)
+    adam = tf.keras.optimizers.Adam(learning_rate=0.00001, decay=0.9)
    # sgd = tf.keras.optimizers.SGD(lr=0.00001, decay=0.01, momentum=0.9, nesterov=True)
-    sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
+   # sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
     
-    model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy',
+    model.compile(optimizer=adam, loss='sparse_categorical_crossentropy',
                   metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
     filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-001.h5'.format(EPOCH, BATCH_SIZE)
@@ -150,8 +142,13 @@ def main():
     steps_per_epoch = int(1231167 / BATCH_SIZE)
     validation_steps = int(50000 / BATCH_SIZE)
 
-    model.fit(train_dataset, validation_data=val_dataset, validation_steps=validation_steps,
-              epochs=EPOCH, batch_size=BATCH_SIZE, steps_per_epoch=steps_per_epoch, callbacks=callbacks)
+    model.fit(train_dataset,
+              validation_data=val_dataset,
+              validation_steps=validation_steps,
+              epochs=EPOCH,
+              batch_size=BATCH_SIZE,
+              steps_per_epoch=steps_per_epoch,
+              callbacks=callbacks)
     ##initial_epoch=100,
 
     # 모델 저장

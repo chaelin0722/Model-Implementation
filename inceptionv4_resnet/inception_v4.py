@@ -7,8 +7,8 @@ from keras.callbacks import ModelCheckpoint
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 import math
+from tensorflow.keras.optimizers import Adam
 
-'''
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try: # Currently, memory growth needs to be the same across GPUs
@@ -19,67 +19,82 @@ if gpus:
     except RuntimeError as e: # Memory growth must be set before GPUs have been initialized
         print(e)
 
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus: # 텐서플로가 첫 번째 GPU에 1GB 메모리만 할당하도록 제한
-    try:
-        tf.config.experimental.set_virtual_device_configuration( gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)])
-    except RuntimeError as e: # 프로그램 시작시에 가상 장치가 설정되어야만 합니다
-        print(e)
 
-'''
+def parse_tfrecord(tfrecord):
+    features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
+                'image/encoded': tf.io.FixedLenFeature([], tf.string)}
+    x = tf.io.parse_single_example(tfrecord, features)
 
-def _parse_tfrecord():
-    def parse_tfrecord(tfrecord):
-        features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
-                    'image/filename': tf.io.FixedLenFeature([], tf.string),
-                    'image/encoded': tf.io.FixedLenFeature([], tf.string)}
-        x = tf.io.parse_single_example(tfrecord, features)
+    x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
+    x_train = transform_images(x_train)
+    y_train = tf.cast(x['image/source_id'], tf.int64)
+    y_train = _transform_targets(y_train)
 
-        x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
-        y_train = tf.cast(x['image/source_id'], tf.int64)
-        x_train = _transform_images()(x_train)
-        y_train = _transform_targets(y_train)
-        return (x_train, y_train), y_train
-    return parse_tfrecord
+    return x_train, y_train
 
 
-def _transform_images():
-    def transform_images(x_train):
-        x_train = tf.image.resize(x_train, (299, 299))
-        x_train = tf.image.random_crop(x_train, (299,299, 3))
-        x_train = tf.image.random_flip_left_right(x_train)
-#        x_train = tf.image.random_saturation(x_train, 0.6, 1.4)
-#        x_train = tf.image.random_brightness(x_train, 0.4)
-        x_train = x_train / 255
-        return x_train
-    return transform_images
+def parse_tfrecord_no_transform(tfrecord):
+
+    features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
+                'image/encoded': tf.io.FixedLenFeature([], tf.string)}
+    x = tf.io.parse_single_example(tfrecord, features)
+
+    y_train = tf.cast(x['image/source_id'], tf.int64)
+    y_train = _transform_targets(y_train)
+    x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
+    x_train = tf.image.resize(x_train, (299,299))
+    x_train = x_train / 255
+
+    return x_train, y_train
+
+
+def transform_images(x_train):
+
+    x_train = tf.image.resize(x_train, (299, 299))
+    x_train = tf.image.random_crop(x_train, (299, 299, 3))
+    x_train = tf.image.random_flip_left_right(x_train)
+    x_train = tf.image.random_saturation(x_train, 0.6, 1.4)
+    x_train = tf.image.random_brightness(x_train, 0.4)
+    x_train = x_train / 255
+
+    return x_train
 
 
 def _transform_targets(y_train):
     return y_train
 
-def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle=True):
-    """load dataset from tfrecord"""
-    #raw_dataset = tf.data.TFRecordDataset(tfrecord_name)
-    raw_dataset = tf.data.Dataset.list_files(tfrecord_name)
+def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle):
 
+    """load dataset from tfrecord"""
+    raw_dataset = tf.data.Dataset.list_files(tfrecord_name, seed=42)
+    raw_dataset = tf.data.TFRecordDataset(raw_dataset)
+
+    '''
     raw_dataset = raw_dataset.interleave(tf.data.TFRecordDataset,
                                  num_parallel_calls=tf.data.experimental.AUTOTUNE,
                                  deterministic=False)
+    '''
 
-    raw_dataset = raw_dataset.repeat()
-
-    if shuffle:
-        raw_dataset = raw_dataset.shuffle(buffer_size=1024)
-
-    dataset = raw_dataset.map(
-        _parse_tfrecord(),
-        num_parallel_calls=tf.data.experimental.AUTOTUNE
-    )
-    dataset = dataset.batch(batch_size)
+    if shuffle is True:
+        dataset = raw_dataset.map(
+            parse_tfrecord,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
+    elif shuffle is False:
+        dataset = raw_dataset.map(
+            parse_tfrecord_no_transform,
+            num_parallel_calls=tf.data.experimental.AUTOTUNE
+        )
+    dataset = dataset.repeat()
+    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
+    if shuffle is True:
+        dataset = dataset.shuffle(buffer_size=10)
+
+
     return dataset
+
 
 
 def conv_block(x, num_filter, num_row, num_col, padding='same', strides=(1, 1), use_bias=False):
@@ -253,11 +268,11 @@ def create_inception_v4():
 
 def main():
 
-    train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train.tfrecord"
-    val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val.tfrecord"
+    train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train2.tfrecord"
+    val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val2.tfrecord"
 
-    train_dataset = load_tfrecord_dataset(train_url,32)
-    val_dataset = load_tfrecord_dataset(val_url, 32)
+    train_dataset = load_tfrecord_dataset(train_url, 32, shuffle=True)
+    val_dataset = load_tfrecord_dataset(val_url, 32, shuffle=False)
 
     # create inception-v4 model
     model = create_inception_v4()
@@ -269,7 +284,7 @@ def main():
 
     # decay every two epochs using exponential rate of 0.94
     def step_decay(epoch):
-        init_lr = 0.0001
+        init_lr = 0.045
         drop = 0.94
         epochs_drop = 2.0
         lrate = init_lr * math.pow(drop, math.floor((1 + epoch) / epochs_drop))
@@ -279,19 +294,18 @@ def main():
         return lrate
 
     # decayed everyh two epochs using exponential rate of 0.94
-    # rmsprop = tf.keras.optimizers.RMSprop(decay=0.9, momentum=0.9, epsilon=1.0)
     rmsprop = tf.keras.optimizers.RMSprop(learning_rate=0.00001, decay=0.9, momentum=0.9, epsilon=1e-5)
     # sgd = tf.keras.optimizers.SGD(lr=1., decay=0.01, momentum=0.9, nesterov=True)
     sgd = tf.keras.optimizers.SGD(lr=0.0001, decay=0.9, momentum=0.9, nesterov=True)
     # adam = tf.keras.optimizers.Adam(learning_rate=0.01)
-    # adadelta = tf.keras.optimizers.Adadelta(lr=0.0001, rho=0.95, epsilon=1.0, decay=0.001)
-    adamax = tf.keras.optimizers.Adamax(lr=0.002, beta_1=0.9, beta_2=0.999)
 
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
+    model.compile(loss='sparse_categorical_crossentropy', optimizer=Adam(learning_rate=step_decay(0)),
+                  metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
     filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-001.h5'.format(EPOCH, BATCH_SIZE)
-    log_dir = "./logs/fit/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-
+    log_dir = "./logs/scalar/"+datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_writer = tf.summary.create_file_writer(log_dir + "/metrics")
+    file_writer.set_as_default()
 
     # 모델의 가중치를 저장하는 콜백
     callbacks = [
