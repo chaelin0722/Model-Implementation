@@ -34,35 +34,28 @@ def parse_tfrecord(tfrecord):
 
 
 def parse_tfrecord_no_transform(tfrecord):
-
     features = {'image/source_id': tf.io.FixedLenFeature([], tf.int64),
                 'image/encoded': tf.io.FixedLenFeature([], tf.string)}
+
     x = tf.io.parse_single_example(tfrecord, features)
 
     y_train = tf.cast(x['image/source_id'], tf.int64)
     y_train = _transform_targets(y_train)
     x_train = tf.image.decode_jpeg(x['image/encoded'], channels=3)
-    x_train = tf.image.resize(x_train, (224, 224))
+    x_train = tf.image.resize(x_train, (224,224))
     x_train = x_train / 255
 
     return x_train, y_train
 
 
 def transform_images(x_train):
-    ran_image_size = random.randint(256, 513)  # min 256 ~ 512 max
-    x_train = tf.image.resize(x_train, (ran_image_size, ran_image_size))
-    x_train = tf.image.random_crop(x_train, (224, 224, 3))
-    x_train = tf.image.random_flip_left_right(x_train)
-    x_train = x_train / 255
 
-    '''
-    x_train = tf.image.resize(x_train, (224, 224))
+    x_train = tf.image.resize(x_train, (224,224))
     x_train = tf.image.random_crop(x_train, (224,224, 3))
     x_train = tf.image.random_flip_left_right(x_train)
     x_train = tf.image.random_saturation(x_train, 0.6, 1.4)
     x_train = tf.image.random_brightness(x_train, 0.4)
     x_train = x_train / 255
-    '''
 
     return x_train
 
@@ -97,11 +90,10 @@ def load_tfrecord_dataset(tfrecord_name, batch_size, shuffle):
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     if shuffle is True:
-        dataset = dataset.shuffle(buffer_size=10)
+        dataset = dataset.shuffle(buffer_size=1024)
 
 
     return dataset
-
 
 def main():
 
@@ -145,18 +137,18 @@ def main():
 
     train_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/train2.tfrecord"
     val_url = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val2.tfrecord"
-    train_dataset = load_tfrecord_dataset(train_url, 8, shuffle=True)
-    val_dataset = load_tfrecord_dataset(val_url, 8, shuffle=False)
+    train_dataset = load_tfrecord_dataset(train_url,16, shuffle=True)
+    val_dataset = load_tfrecord_dataset(val_url, 16, shuffle=False)
 
 
     EPOCH = 100
-    BATCH_SIZE = 8
+    BATCH_SIZE = 16
 
     adam = tf.keras.optimizers.Adam(learning_rate=0.0001, decay=0.9)
     # sgd = tf.keras.optimizers.SGD(lr=0.00001, decay=0.01, momentum=0.9, nesterov=True)
     sgd = SGD(lr=0.00001, decay=1e-6, momentum=0.9, nesterov=True)
     optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=0.001)
-    model.compile(optimizer=adam, loss='sparse_categorical_crossentropy',
+    model.compile(optimizer=sgd, loss='sparse_categorical_crossentropy',
                   metrics=["accuracy", tf.keras.metrics.SparseTopKCategoricalAccuracy(5)])
 
     filename = 'checkpoints/checkpoint-epoch-{}-batch-{}-trial-001.h5'.format(EPOCH, BATCH_SIZE)
@@ -178,8 +170,8 @@ def main():
     validation_steps = int(50000 / BATCH_SIZE)
 
 
-
-    model.fit(train_dataset, validation_data=val_dataset,
+    '''
+    model.fit(train_dataset, validation_data = val_dataset,
               validation_steps=validation_steps,
               epochs=EPOCH, batch_size=BATCH_SIZE,
               steps_per_epoch=steps_per_epoch,
@@ -187,7 +179,8 @@ def main():
 
     # 모델 저장
     model.save('my_vgg_16.h5')
-
+    '''
+    model.summary()
 
 if __name__ == '__main__':
     main()

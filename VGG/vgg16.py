@@ -99,7 +99,7 @@ def create_vgg_16():
     output = Dense(1000, activation="softmax")(x)
 
     model = Model(inputs=input_data, outputs=output, name='vgg-16')
-
+    model.summary()
     return model
 
 def main():

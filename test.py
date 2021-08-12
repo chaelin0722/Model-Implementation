@@ -18,7 +18,7 @@ from keras.preprocessing import image
 from keras.applications.resnet50 import preprocess_input, decode_predictions
 import numpy as np
 
-
+'''
 BATCH_SIZE = 32
 
 import tensorflow as tf
@@ -67,3 +67,70 @@ def get_dataset_val(path, batch_size=BATCH_SIZE):
 # tfrecord data load
 train_dataset= get_dataset_train("/home/hjpark/pycharmProject/Alexnet/imagenet_prep/tf_records/train/*.tfrecord")
 val_dataset= get_dataset_val("/home/hjpark/pycharmProject/Alexnet/imagenet_prep/tf_records/val/*.tfrecord")
+'''
+
+from glob import glob
+import os
+import random
+import tensorflow as tf
+
+
+def serialize_example(image, label):
+    feature = {
+        'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[image])),
+        'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label]))
+    }
+
+    example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
+    return example_proto.SerializeToString()
+
+
+def get_file_size(file_path):
+    size = os.path.getsize(file_path)
+    return size
+
+
+def make_tfrecords(path, record_file):
+    print('start')
+
+    file_index_count = 0
+    classes = os.listdir(path)
+    classes.sort()
+    files_list = glob(path + '/*/*')
+    random.shuffle(files_list)
+    writer = tf.io.TFRecordWriter(record_file.format(file_index_count))
+    print(f'Total image files: {len(files_list)}')
+    print(f'TFRecord number: {file_index_count}')
+
+    for filename in files_list:
+        image_string = open(filename, 'rb').read()
+        category = filename.split('/')[-2]
+        label = classes.index(category)
+        tf_example = serialize_example(image_string, label)
+        writer.write(tf_example)
+        # print(f'class:{label}__{filename}')
+
+        size = get_file_size(record_file.format(file_index_count))
+        mg_size = round(size / (1024 * 1024), 3)
+        # print('File size: ' + str(mg_size) + ' Megabytes')
+
+        if mg_size > 100:
+            file_index_count += 1
+            writer = tf.io.TFRecordWriter(record_file.format(file_index_count))
+            print(f'TFRecord number: {file_index_count}, {files_list.index(filename)}')
+
+    print('done')
+
+
+def main():
+
+    dataset_path = "/home/ivpl-d14/PycharmProjects/imagenet/imagenet/val"
+    output_path = "/home/ivpl-d14/PycharmProjects/pythonProject/model_implementation/Model-Implementation/tfrecords/tf_train/val_ji.tfrecord"
+    make_tfrecords(dataset_path, output_path)
+
+
+
+
+
+if __name__ == '__main__':
+    main()
