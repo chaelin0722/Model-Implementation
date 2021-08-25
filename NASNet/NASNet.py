@@ -112,12 +112,10 @@ class Reduce_prev_layer(nn.Module):
         if x_1 is None:
             x_1 = x
 
-        # x_1的长宽与x不同 （filters也可能不同）
         if self.x_width != self.x_1_width:
             x_1 = self.relu(x_1)
             x_1 = self.factorized_reduction(x_1, stride=2)
 
-        # 仅filter个数不同
         elif self.x_1_channels != self.num_of_filters:
             x_1 = self.relu(x_1)
             x_1 = self.conv(x_1)
@@ -618,7 +616,7 @@ if __name__ == "__main__":
                'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
     # 모델을 CUDA에 맞게 작동하도록 변경
-    print("---------network----------")
+    print("---------network----------!")
     net = NASnet()
     net.to(device)
 
@@ -631,6 +629,8 @@ if __name__ == "__main__":
     ## loss and optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.0001, momentum=0.9)
+    # save checkpoint
+    ckpt_path = './checkpoint/checkpoint-epoch-{}-batch-{}-trial-{}-.ckpt'.format(num_epochs, batch_size,1)
 
     # train
     for epoch in range(num_epochs):  # 데이터셋을 수차례 반복
@@ -646,8 +646,6 @@ if __name__ == "__main__":
             # 순전파 + 역전파 + 최적화를 한 후
             outputs = net(inputs, num_epochs)
             loss = criterion(outputs, labels)
-            # save checkpoint
-            ckpt_path = './checkpoint/checkpoint-epoch-{}-batch-{}-trial-{}-.ckpt'.format(num_epochs, batch_size,1)
             torch.save({
                 'epoch': epoch,
                 'model_state_dict':net.state_dict(),

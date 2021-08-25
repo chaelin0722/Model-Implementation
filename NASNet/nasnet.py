@@ -1,6 +1,5 @@
 ## pytorch-lightning
 # https://visionhong.tistory.com/30
-
 import pytorch_lightning as pl
 from efficientnet_pytorch import EfficientNet
 from pytorch_lightning.metrics.classification import AUROC
