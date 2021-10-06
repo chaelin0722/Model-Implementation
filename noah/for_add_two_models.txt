@@ -1,0 +1,5 @@
+classification, detection 두 모델을 합칠 때 고려할 사항
+
+1. 경로 문제
+2. detect 할 때 34개 혹은 25개로 crop 갯수 맞춰졌는지 확인
+3. 총 걸리는 시간 
