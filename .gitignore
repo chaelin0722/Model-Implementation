@@ -17,3 +17,4 @@ logs/*
 logs2/*
 */logs2.*
 */*.h5
+NOAH/
