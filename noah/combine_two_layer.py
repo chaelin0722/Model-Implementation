@@ -37,7 +37,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 # through the command line argument --logs
 # DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_LOGS_DIR = "./logs"
-DEFAULT_IMAGE_DIR = "./val"
+DEFAULT_IMAGE_DIR = "./test"  #./val"
 DEFAULT_MRCNN_MODEL_DIR = "./mask_rcnn_toothbrush_head_0015.h5"
 DEFAULT_EFF_MODEL_DIR = '/home/clkim/PycharmProjects/NOAH/dataset/checkpoints/efficient-best_weight_1014.h5'
 
@@ -90,7 +90,7 @@ def color_splash(image, mask):
         splash = gray.astype(np.uint8)
     return splash
 
-
+detect_time = []
 def detect_and_color_splash(model, image_path=None, img_file_name=None):
     assert image_path
 
@@ -109,7 +109,7 @@ def detect_and_color_splash(model, image_path=None, img_file_name=None):
     end_inference = time.time()
     inference_time = end_inference - start_inference
     print(f"{inference_time:.2f} sec for inferencing {img_file_name}")
-
+    detect_time.append(inference_time)
 
     # bounding box visualize
     class_names = ['background', 'defect']
@@ -138,6 +138,8 @@ def detect_and_color_splash(model, image_path=None, img_file_name=None):
 ############################################################
 #  classification
 ############################################################
+result =[]
+class_time = []
 def binary_classification(imgname, model):
 
 
@@ -155,10 +157,18 @@ def binary_classification(imgname, model):
         shuffle=False,
         class_mode=None
     )
-
+    start_classification = time.time()
     preds = model.predict_generator(test_generator, steps=len(test_generator.filenames))
 
-    print(preds)
+    end_classification = time.time()
+
+    ## check time
+    inference_time = end_classification - start_classification
+    print(f"{inference_time:.2f} sec for inferencing toothbrush hair")
+    class_time.append(inference_time)
+
+
+    # print(preds)
     image_ids = [name.split('/')[-1] for name in test_generator.filenames]
     predictions = preds.flatten()
 
@@ -174,16 +184,12 @@ def binary_classification(imgname, model):
 
     submission = pd.DataFrame(data)
     # final classification! whether error or not
-    result = []
+
     if (submission['category'] == 'error').any():
         print(f'{imgname} is error tooth brush')
         result.append(imgname)
-        #print("error toothbrush")
 
     return result
-    #submission.to_csv("./test_result.csv", index=False)
-
-
 ############################################################
 #  main
 ############################################################
@@ -240,16 +246,30 @@ if __name__ == '__main__':
 
     # each image in folder
     image_path = DEFAULT_IMAGE_DIR
-    dirs = os.listdir(image_path)
+    image_dir = os.path.join(image_path + "/test")
+
+    dirs = os.listdir(image_dir)
     # print(dirs)
     images = [file for file in dirs if file.endswith('.bmp')]
     # print("len iamges :::: ", len(images))
     for img in images:
-        imgname = os.path.join(image_path, img)
+        imgname = os.path.join(image_dir, img)
         onlyname, _ = os.path.splitext(img)
         imgname_png = onlyname + '.png'
         # output_imgname = os.path.join(image_path, imgname_png)
         detect_and_color_splash(mrcnn_model, image_path=imgname, img_file_name=imgname_png)
 
         err_toothbrush_list = binary_classification(onlyname, eff_model)
+
         print(err_toothbrush_list)
+        print("ddd_ time: ", detect_time)
+        print("ccc_ time: ", class_time)
+
+
+
+    ### compute time
+    detect_avg = sum(detect_time, 0.0) / len(detect_time)
+    classi_avg = sum(class_time, 0.0) / len(class_time)
+
+    print("average classification time : ", classi_avg)
+    print("average detection time : ", detect_avg)
