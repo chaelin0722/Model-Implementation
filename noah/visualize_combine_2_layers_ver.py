@@ -129,7 +129,7 @@ def display_instances(save_path, image_path, image, boxes, masks, class_ids, cla
     ### crop and save path
     image_name = Path(image_path).stem  # image_name = 프레임_0036_20210305145405
     image_dir = os.path.dirname(image_path)  # image_dir : ./train
-    for_test_dir = './val/cropped'
+    for_test_dir = './test/cropped'
     # print("image_dir", image_dir)
     new_path = os.path.join(for_test_dir, image_name)  # new_path = ./val/cropped/프레임_0036_20210305145405/test
     new_path = os.path.join(new_path+"/test")
