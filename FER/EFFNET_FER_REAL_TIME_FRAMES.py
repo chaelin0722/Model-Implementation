@@ -1,3 +1,12 @@
+'''
+https://github.com/HSE-asavchenko/face-emotion-recognition/blob/main/src/AFEW_train.ipynb
+
+위의 코드 참고해서 frame 10장씩 계산하게 하는 코드
+
+REAL-TIME video frames
+'''
+
+
 import dlib
 import os
 from PIL import Image
