@@ -171,88 +171,9 @@ def mobilenet_preprocess_input(x, **kwargs):
     return x
 
 
-def get_features_scores(image):
-    filename2features = {}
-    X_global_features, X_feats, X_scores, X_isface = [], [], [], []
-    images = image
-    images_10 = []
-    i = 0
-    for imgs in images:
-        X_isface.append(True)  # making bbox means has face! so always have faces
-
-        images_10.append(imgs)
-        inp = preprocessing_function(np.array(images_10, dtype=np.float32))
-        global_features, feats, scores = feature_extractor_model.predict(inp)
-        print(global_features.shape, feats.shape, scores.shape)
-
-        if len(X_feats) == 0:
-            X_feats = feats
-            X_global_features = global_features
-            X_scores = scores
-        else:
-            X_feats = np.concatenate((X_feats, feats), axis=0)
-            X_global_features = np.concatenate((X_global_features, global_features), axis=0)
-            X_scores = np.concatenate((X_scores, scores), axis=0)
-
-    print("global", X_global_features)
-    X_isface = np.array(X_isface)
-    # print(X_global_features.shape,X_feats.shape,X_scores.shape)
-
-    filename2features[i] = (X_global_features, X_feats, X_scores, X_isface)
-    i += 1
-
-    return filename2features
-
-
 ## create dataset ==> concat function scores
 
 USE_ALL_FEATURES = True
-
-
-def create_dataset(filename2features):
-    x = []
-    y = []
-    has_faces = []
-    ind = 0
-    features = filename2features[0]
-    total_features = None
-
-    if USE_ALL_FEATURES and True:
-        print('here')
-        # for face in [1, 0]:
-        cur_features = features[ind]
-
-        # if len(cur_features) == 0:
-        #    continue
-        weight = len(cur_features) / len(features[ind])
-        mean_features = np.mean(cur_features, axis=0)
-        std_features = np.std(cur_features, axis=0)
-        max_features = np.max(cur_features, axis=0)
-        min_features = np.min(cur_features, axis=0)
-
-        # join several features together
-        feature = np.concatenate((mean_features, std_features, min_features, max_features), axis=None)
-        print("Feature", feature)
-        if total_features is None:
-            total_features = weight * feature
-        else:
-            total_features += weight * feature
-    has_faces.append(1)
-    print("total_Features : ", total_features)
-
-    if total_features is not None:
-        print("totla features is not none")
-        x.append(total_features)
-        # y.append(emotion_to_index[category])
-
-    print("out of for moon")
-    x = np.array(x)
-    y = np.array(y)
-    has_faces = np.array(has_faces)
-    # print("x : ", x.shape, "y :", y.shape, "has_face : ", has_faces)
-    # return x, y, has_faces
-    return x  # , y, has_faces
-
 
 ## dlib
 detector = dlib.get_frontal_face_detector()
