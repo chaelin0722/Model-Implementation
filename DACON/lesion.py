@@ -54,7 +54,7 @@ DEFAULT_LOGS_DIR = "./logs"
 
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ['CUDA_VISIBLE_DEVICES'] = "2"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 
 ############################################################
@@ -137,9 +137,15 @@ class LesionDataset(utils.Dataset):
             # The if condition is needed to support VIA versions 1.x and 2.x.
             if type(a['regions']) is dict:
                 polygons = [r['shape_attributes'] for r in a['regions'].values()]
+                objects = [s['region_attributes']['category_id'] for s in a['regions'].values()]
             else:
-                polygons = [r['shape_attributes'] for r in a['regions']] 
+                polygons = [r['shape_attributes'] for r in a['regions']]
+                objects = [s['region_attributes']['category_id'] for s in a['regions']]
 
+            #name_dict = {"01_ulcer":1, "02_mass":2, "04_lymph":3, "05_bleeding":4}
+            name_dict = {'1': 1, '2': 2, '3': 3, '4': 4}
+            num_ids = [name_dict[a] for a in objects]
+            #print(num_ids)
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
             # the image. This is only managable since the dataset is tiny.
@@ -154,7 +160,8 @@ class LesionDataset(utils.Dataset):
                 image_id=annotation_[i], #a['filename'],  # use file name as a unique image id
                 path=image_path,
                 width=width, height=height,
-                polygons=polygons)
+                polygons=polygons,
+                num_ids = num_ids)
             i += 1    
 
     def load_mask(self, image_id):
@@ -172,6 +179,8 @@ class LesionDataset(utils.Dataset):
         # Convert polygons to a bitmap mask of shape
         # [height, width, instance_count]
         info = self.image_info[image_id]
+        num_ids = info['num_ids'] ## added
+
         mask = np.zeros([info["height"], info["width"], len(info["polygons"])],
                         dtype=np.uint8)
         for i, p in enumerate(info["polygons"]):
@@ -189,7 +198,9 @@ class LesionDataset(utils.Dataset):
 
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID only, we return an array of 1s
-        return mask.astype(np.bool_), np.ones([mask.shape[-1]], dtype=np.int32)
+        num_ids = np.array(num_ids, dtype=np.int32)
+        return mask.astype(np.bool_), num_ids
+        # return mask.astype(np.bool_), np.ones([mask.shape[-1]], dtype=np.int32)
 
     def image_reference(self, image_id):
         """Return the path of the image."""
@@ -217,7 +228,7 @@ def train(model):
     # COCO trained weights, we don't need to train too long. Also,
     # no need to train all layers, just the heads should do it.
     print("Training network heads")
-    model.train(dataset_train,# dataset_val,
+    model.train(dataset_train, val_dataset = dataset_train,
                 learning_rate=config.LEARNING_RATE,
                 epochs=30,
                 layers='3+')
@@ -255,7 +266,10 @@ def detect_and_color_splash(model, image_path=None, video_path=None, img_file_na
         # Detect objects
         r = model.detect([image], verbose=1)[0]
         # bounding box visualize
-        class_names = ['background', 'defect']
+        class_names = ['background']
+        for i in range(1, 5):
+            class_names.append(str(i))
+
         bbox = utils.extract_bboxes(r['masks'])
         file_name_bb = "bb_splash_{}".format(img_file_name)
         save_path_bb = os.path.join(args.image, 'result', file_name_bb)
@@ -319,11 +333,11 @@ if __name__ == '__main__':
                         help="'train' or 'splash'")
     parser.add_argument('--dataset', required=False,
                         metavar="/path/to/balloon/dataset/",
-                        default='/home/ubuntu/hjpark/DACON/Lesion/dataset/COCO_format/train_img/',
+                        default='/home/ivpl-d28/Pycharmprojects/Mask-R-CNN/detect_code/dataset/train_img/',
                         help='Directory of the Balloon dataset')
     parser.add_argument('--weights', required=False,
                         metavar="/path/to/weights.h5",
-                        default='/home/ubuntu/clkim/dacon/Mask-R-CNN/mask_rcnn_coco.h5',
+                        default='/home/ivpl-d28/Pycharmprojects/Mask-R-CNN/mask_rcnn_coco.h5',
                         help="Path to weights .h5 file or 'coco'")
     parser.add_argument('--logs', required=False,
                         default=DEFAULT_LOGS_DIR,
@@ -331,7 +345,7 @@ if __name__ == '__main__':
                         help='Logs and checkpoints directory (default=logs/)')
     parser.add_argument('--image', required=False,
                         metavar="path or URL to image",
-                        default='/home/ubuntu/hjpark/DACON/Lesion/dataset/COCO_format/test_img',
+                        default='',
                         help='Image to apply the color splash effect on')
     parser.add_argument('--video', required=False,
                         metavar="path or URL to video",
@@ -406,11 +420,11 @@ if __name__ == '__main__':
         image_path = args.image
         dirs = os.listdir(image_path)
         print(dirs)
-        images = [file for file in dirs if file.endswith('.bmp')]
+        images = [file for file in dirs if file.endswith('.jpg')]
         for img in images:
             imgname = os.path.join(image_path, img)
             onlyname, _ = os.path.splitext(img)
-            imgname_png = onlyname + '.png'
+            imgname_png = onlyname + '.jpg'
             # output_imgname = os.path.join(image_path, imgname_png)
             detect_and_color_splash(model, image_path=imgname, video_path=args.video, img_file_name=imgname_png)
     else:
