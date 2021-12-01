@@ -33,7 +33,14 @@ import json
 import datetime
 import numpy as np
 import skimage.draw
+import pandas as pd
+import tensorflow as tf
 import matplotlib.pyplot as plt
+
+results = {
+    'file_name': [], 'class_id': [], 'confidence': [], 'point1_x': [], 'point1_y': [],
+    'point2_x': [], 'point2_y': [], 'point3_x': [], 'point3_y': [], 'point4_x': [], 'point4_y': []
+}
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../")
@@ -71,7 +78,7 @@ class LeisonConfig(Config):
 
     # We use a GPU with 12GB memory, which can fit two images.
     # Adjust down if you use a smaller GPU.
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 4  # Background + classes
@@ -80,9 +87,9 @@ class LeisonConfig(Config):
     STEPS_PER_EPOCH = 100
 
     # Skip detections with < 90% confidence
-    DETECTION_MIN_CONFIDENCE = 0.9
+    DETECTION_MIN_CONFIDENCE = 0.5
 
-
+    print("DETECTION_CONFIDENCE", DETECTION_MIN_CONFIDENCE)
 ############################################################
 #  Dataset
 ############################################################
@@ -94,11 +101,17 @@ class LesionDataset(utils.Dataset):
         dataset_dir: Root directory of the dataset.
         subset: Subset to load: train or val
         """
-        # Add classes. We have only one class to add.
+        # Add classes.
+        '''
         self.add_class("lesion", 1, "01_ulcer")
         self.add_class("lesion", 2, "02_mass")
         self.add_class("lesion", 3, "04_lymph")
         self.add_class("lesion", 4, "05_bleeding")
+        '''
+        self.add_class("lesion", 1, "1")
+        self.add_class("lesion", 2, "2")
+        self.add_class("lesion", 3, "3")
+        self.add_class("lesion", 4, "4")
 
         # Train or validation dataset?
         #assert subset in ["train_img"] #, "val"]
@@ -120,7 +133,7 @@ class LesionDataset(utils.Dataset):
         # }
         # We mostly care about the x and y coordinates of each region
         # Note: In VIA 2.0, regions was changed from a dict to a list.
-        annotations = json.load(open("./via_region_data.json"))
+        annotations = json.load(open(os.path.join(dataset_dir,"via_region_data.json")))
         annotation_ = list(annotations)
         annotations = list(annotations.values())  # don't need the dict keys
 
@@ -145,19 +158,18 @@ class LesionDataset(utils.Dataset):
             #name_dict = {"01_ulcer":1, "02_mass":2, "04_lymph":3, "05_bleeding":4}
             name_dict = {'1': 1, '2': 2, '3': 3, '4': 4}
             num_ids = [name_dict[a] for a in objects]
-            #print(num_ids)
+
+            print(f'image: {annotation_[i]}, num_ids : {num_ids}')
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
             # the image. This is only managable since the dataset is tiny.
             image_path = os.path.join(dataset_dir, annotation_[i])# a['filename'])
-            #print("image_path", image_path)
-
             image = skimage.io.imread(image_path)
             height, width = image.shape[:2]
 
             self.add_image(
                 "lesion",
-                image_id=annotation_[i], #a['filename'],  # use file name as a unique image id
+                image_id= annotation_[i], #a['filename'],  # use file name as a unique image id
                 path=image_path,
                 width=width, height=height,
                 polygons=polygons,
@@ -176,17 +188,21 @@ class LesionDataset(utils.Dataset):
         if image_info["source"] != "lesion":
             return super(self.__class__, self).load_mask(image_id)
 
+
         # Convert polygons to a bitmap mask of shape
         # [height, width, instance_count]
         info = self.image_info[image_id]
+        if info["source"] != "lesion":
+            return super(self.__class__, self).load_mask(image_id)
         num_ids = info['num_ids'] ## added
-
         mask = np.zeros([info["height"], info["width"], len(info["polygons"])],
                         dtype=np.uint8)
+
         for i, p in enumerate(info["polygons"]):
             # Get indexes of pixels inside the polygon and set them to 1
             # modify for rectangle
             #---------------------------------------------------------------------------------
+
             if p['name'] == 'rect':
                 all_points_x = [p['x'], p['x'] + p['width'], p['x'] + p['width'], p['x']]
                 all_points_y = [p['y'], p['y'], p['y'] + p['height'], p['y'] + p['height']]
@@ -199,7 +215,8 @@ class LesionDataset(utils.Dataset):
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID only, we return an array of 1s
         num_ids = np.array(num_ids, dtype=np.int32)
-        return mask.astype(np.bool_), num_ids
+        print("load_ mask_num_ids", num_ids)
+        return mask, num_ids
         # return mask.astype(np.bool_), np.ones([mask.shape[-1]], dtype=np.int32)
 
     def image_reference(self, image_id):
@@ -230,7 +247,7 @@ def train(model):
     print("Training network heads")
     model.train(dataset_train, val_dataset = dataset_train,
                 learning_rate=config.LEARNING_RATE,
-                epochs=30,
+                epochs=70,
                 layers='3+')
 
 
@@ -265,16 +282,44 @@ def detect_and_color_splash(model, image_path=None, video_path=None, img_file_na
         image = skimage.io.imread(image_path)
         # Detect objects
         r = model.detect([image], verbose=1)[0]
+
+        threshold = 0.5
+
+        idx = np.where(r['scores'] > threshold)[0]
+
+        for i in idx:
+            x_min, y_min, x_max, y_max = r['rois'][i]
+            class_id = r['class_ids'][i]
+            print(f'class_id{i}', class_id)
+            confidence = r['scores'][i]
+            # think various bbox in an image!!!
+
+            results['file_name'].append(img_file_name)
+            results['class_id'].append(class_id)
+            results['confidence'].append(confidence)
+            results['point1_x'].append(x_min)
+            results['point1_y'].append(y_min)
+            results['point2_x'].append(x_max)
+            results['point2_y'].append(y_min)
+            results['point3_x'].append(x_max)
+            results['point3_y'].append(y_max)
+            results['point4_x'].append(x_min)
+            results['point4_y'].append(y_max)
+            print("class_id", class_id)
+
+
         # bounding box visualize
         class_names = ['background']
         for i in range(1, 5):
             class_names.append(str(i))
+        ##3
+        # class_names = ['background',1','2','3','4']
 
         bbox = utils.extract_bboxes(r['masks'])
         file_name_bb = "bb_splash_{}".format(img_file_name)
         save_path_bb = os.path.join(args.image, 'result', file_name_bb)
         visualize.display_instances(save_path_bb, image, bbox, r['masks'], r['class_ids'], class_names, r['scores'])
-        # skimage.io.imsave(save_path_bb, bb_splash)
+        #skimage.io.imsave(save_path_bb, bb_splash)
         # Color splash
         splash = color_splash(image, r['masks'])
         # Save output
@@ -345,12 +390,15 @@ if __name__ == '__main__':
                         help='Logs and checkpoints directory (default=logs/)')
     parser.add_argument('--image', required=False,
                         metavar="path or URL to image",
-                        default='',
+                        default='./dataset/test_img',
                         help='Image to apply the color splash effect on')
     parser.add_argument('--video', required=False,
                         metavar="path or URL to video",
                         help='Video to apply the color splash effect on')
     args = parser.parse_args()
+
+
+
 
     # Validate arguments
     if args.command == "train":
@@ -427,6 +475,13 @@ if __name__ == '__main__':
             imgname_png = onlyname + '.jpg'
             # output_imgname = os.path.join(image_path, imgname_png)
             detect_and_color_splash(model, image_path=imgname, video_path=args.video, img_file_name=imgname_png)
+
+        submission = pd.DataFrame(results)
+        print(submission.shape)
+        print(submission.head())
+
+        submission.to_csv('./1201_mrcnn_epoch30.csv', index=False)
+
     else:
         print("'{}' is not recognized. "
               "Use 'train' or 'splash'".format(args.command))
