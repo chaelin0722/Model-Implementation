@@ -1,56 +1,45 @@
 import dlib
-import os
-from PIL import Image
 import cv2
-from sklearn import preprocessing
 # from keras.preprocessing.image import img_to_array
 
 import numpy as np
 from skimage import transform as trans
 
 import tensorflow as tf
-## mtcnn
-from sklearn.ensemble import RandomForestClassifier
 
 from facial_analysis import FacialImageProcessing
 
 from tensorflow.keras.models import load_model, Model
 
-## for error
-# config = tf.ConfigProto()
+## landmark 설정
+landmark_model = "../models/shape_predictor_68_face_landmarks.dat"
+landmark_detector = dlib.shape_predictor(landmark_model)
 
-# config.gpu_options.allow_growth = True
-
-# tf.Session(config=config)
-
+## 클래스 정의
 idx_to_class = {0: 'Anger', 1: 'Disgust', 2: 'Fear', 3: 'Happiness', 4: 'Neutral', 5: 'Sadness', 6: 'Surprise'}
+
+## 모델 로드
 base_model = load_model('../models/affectnet_emotions/mobilenet_7.h5')
 
-# base_model = load_model('../models/pretrained_faces/age_gender_tf2_224_deep-03-0.13-0.97.h5')
-# base_model = torch.load("../models/pretrained_faces/state_vggface2_enet0_new.pt")
-
-feature_extractor_model = Model(base_model.input,
-                                [base_model.get_layer('global_pooling').output, base_model.get_layer('feats').output,
-                                 base_model.output])
-feature_extractor_model.summary()
-_, w, h, _ = feature_extractor_model.input.shape
-
-# afew_model = load_model('C:/Users/ccaa9/PycharmProjects/real-time_recognition/face-emotion-recognition/models/affectnet_emotion/enet_b0_8_best_afew.pt')
-
-# PyTorch의 가중치는 GPU용으로 저장이 되어있는 경우가 많기 때문에 꼭 map_location 인자를 넣어주어야 합니다.
-# torch_state_dict = torch.load(afew_model, map_location=torch.device("cpu"))
-# 기본적으로 torch.Tensor로 로딩이 됩니다. 따라서 detach()와 numpy() 메소드를 불러주는 것이 꼭 필요합니다.
-# torch_state_dict = {key: val.detach().numpy() for key, val in torch_state_dict.items()}
 
 
-landmark_model = 'shape_predictor_68_face_landmarks.dat'
-
+# 이미지 전처리
 imgProcessing = FacialImageProcessing(False)
-print(tf.__version__)
 
-landmark_detector = dlib.shape_predictor(landmark_model)
-emotion_to_index = {'Angry': 0, 'Disgust': 1, 'Fear': 2, 'Happy': 3, 'Neutral': 4, 'Sad': 5, 'Surprise': 6}
 INPUT_SIZE = (224, 224)
+# landmark detection using dlib
+def lanmark(image, face):
+    # 얼굴에서 68개 점 찾기
+    landmarks = landmark_detector(image, face)
+
+    # create list to contain landmarks
+    landmark_list = []
+
+    # append (x, y) in landmark_list
+    for p in landmarks.parts():
+        landmark_list.append([p.x, p.y])
+        cv2.circle(image, (p.x, p.y), 2, (255, 255, 255), -1)
+
 
 
 ### extract frames
@@ -100,7 +89,7 @@ def get_iou(bb1, bb2):
 
 
 # print(get_iou([10,10,20,20],[15,15,25,25]))
-
+'''
 def preprocess(img, bbox=None, landmark=None, **kwargs):
     M = None
     image_size = [224, 224]
@@ -134,6 +123,7 @@ def preprocess(img, bbox=None, landmark=None, **kwargs):
             det[3] = img.shape[0] - det[1]
         else:
             det = bbox
+
         margin = kwargs.get('margin', 44)
         bb = np.zeros(4, dtype=np.int32)
         bb[0] = np.maximum(det[0] - margin // 2, 0)
@@ -141,6 +131,7 @@ def preprocess(img, bbox=None, landmark=None, **kwargs):
         bb[2] = np.minimum(det[2] + margin // 2, img.shape[1])
         bb[3] = np.minimum(det[3] + margin // 2, img.shape[0])
         ret = img[bb[1]:bb[3], bb[0]:bb[2], :]
+
         if len(image_size) > 0:
             ret = cv2.resize(ret, (image_size[1], image_size[0]))
         return ret
@@ -150,18 +141,6 @@ def preprocess(img, bbox=None, landmark=None, **kwargs):
         return warped
 
 
-# landmark detection using dlib
-def lanmark(image, face):
-    # 얼굴에서 68개 점 찾기
-    landmarks = landmark_detector(image, face)
-
-    # create list to contain landmarks
-    landmark_list = []
-
-    # append (x, y) in landmark_list
-    for p in landmarks.parts():
-        landmark_list.append([p.x, p.y])
-        cv2.circle(image, (p.x, p.y), 2, (255, 255, 255), -1)
 
 
 def mobilenet_preprocess_input(x, **kwargs):
@@ -169,7 +148,7 @@ def mobilenet_preprocess_input(x, **kwargs):
     x[..., 1] -= 116.779
     x[..., 2] -= 123.68
     return x
-
+'''
 
 ## create dataset ==> concat function scores
 
@@ -178,64 +157,75 @@ USE_ALL_FEATURES = True
 ## dlib
 detector = dlib.get_frontal_face_detector()
 
+
 ## main
-
-preprocessing_function = mobilenet_preprocess_input
 # webcam open
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+try:
+    cap = cv2.VideoCapture(0)
 
-print('camera is opened width: {0}, height: {1}'.format(cap.get(3), cap.get(4)))
+except Exception as e:
+        print(str(e))
 
-if cap.isOpened():
-    print('width: {}, height : {}'.format(cap.get(3), cap.get(4)))
+if cap.isOpened:
+    print('camera is opened width: {0}, height: {1}'.format(cap.get(3), cap.get(4)))
 
-while (cap.isOpened()):
 
+while(cap.isOpened()):
     ret, image = cap.read()
-
+    # 카메라가 작동한다면..
     if ret:
-        frame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        frame = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) # 영상 이미지를 rgb 형식으로 변환
 
-        bounding_boxes, points = imgProcessing.detect_faces(frame)  #프레임 하나씩 처리얼굴 찾기
-
-        #print(bounding_boxes.size)
+        bounding_boxes, points = imgProcessing.detect_faces(frame)  # 프레임에서 찾은 얼굴 전처리해서 바운딩 박스와 포인트 값으로 반환
+        # 행렬을 전치 시키기
         points = points.T
 
+        # loop as the number of face, one loop per one face
         for bbox, p in zip(bounding_boxes, points):
             box = bbox.astype(int)
             x1, y1, x2, y2 = box[0:4]
             face_img = frame[y1:y2, x1:x2, :]
 
-            face_img = cv2.resize(face_img, INPUT_SIZE)
-            inp = face_img.astype(np.float32)
-            inp[..., 0] -= 103.939
-            inp[..., 1] -= 116.779
-            inp[..., 2] -= 123.68
-            inp = np.expand_dims(inp, axis=0)
-            scores = base_model.predict(inp)[0]
+            # 얼굴이 잡히는데 정해진 사이즈보다 클 경우 예외처리
+            try:
+                face_img = cv2.resize(face_img, INPUT_SIZE)
 
-            emotion = idx_to_class[np.argmax(scores)]
+                inp = face_img.astype(np.float32)
+                inp[..., 0] -= 103.939
+                inp[..., 1] -= 116.779
+                inp[..., 2] -= 123.68
+                inp = np.expand_dims(inp, axis=0)
+                scores = base_model.predict(inp)[0] ## error
+                print(base_model.predict(inp))
+                print(scores)
 
-            p = p.reshape((2, 5)).T
+                emotion = idx_to_class[np.argmax(scores)]
 
-            # top, left, bottom, right = box[0:4]
-            # face=dlib.rectangle(left, top, right, bottom)
-            face = dlib.rectangle(x1, y1, x2, y2)
+                p = p.reshape((2, 5)).T
 
-            face_img = preprocess(frame, box, p)  ## CROPPED AND ALIGNED
-            face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+                # top, left, bottom, right = box[0:4]
+                # face=dlib.rectangle(left, top, right, bottom)
+                face = dlib.rectangle(x1, y1, x2, y2)
 
-        ###show aligned cropped image
-            cv2.imshow("face_img", face_img)
+                #face_img = preprocess(frame, box, p)  ## CROPPED AND ALIGNED
+                #face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
 
-        if bounding_boxes.size != 0:
-            ### draw bounding box on original image
-            cv2.rectangle(image, (face.left() - 5, face.top() - 5), (face.right() + 5, face.bottom() + 5),
-                          (0, 186, 255), 3)
+                ##show aligned cropped image
+                #cv2.imshow("face_img", face_img)
 
-            cv2.putText(image, emotion, (int(face.left()) + 10, int(face.top()) - 10), cv2.FONT_HERSHEY_COMPLEX,
-                        0.8,
-                        (255, 255, 255), 2, cv2.LINE_AA)
+                ''' landmark detection '''
+                lanmark(image, face)
+
+                ### draw bounding box on original image
+                cv2.rectangle(image, (face.left() - 5, face.top() - 5), (face.right() + 5, face.bottom() + 5),
+                              (0, 186, 255), 3)
+
+                cv2.putText(image, emotion, (int(face.left()) + 10, int(face.top()) - 10), cv2.FONT_HERSHEY_COMPLEX,
+                            0.8,
+                            (255, 255, 255), 2, cv2.LINE_AA)
+
+            except Exception as e:
+                print(str(e))
 
 
         cv2.imshow("original", image)
