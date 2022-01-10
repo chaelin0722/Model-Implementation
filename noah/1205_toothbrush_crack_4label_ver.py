@@ -50,7 +50,7 @@ class ToothBrushCrackConfig(Config):
     STEPS_PER_EPOCH = 100
 
     # Skip detections with < 90% confidence
-    DETECTION_MIN_CONFIDENCE = 0.5
+    DETECTION_MIN_CONFIDENCE = 0.7
 
 
 ############################################################
@@ -64,7 +64,7 @@ class ToothBrushCrackDataset(utils.Dataset):
         dataset_dir: Root directory of the dataset.
         subset: Subset to load: train or val
         """
-        # Add classes. We have only one class to add.
+        # Add classes.
         self.add_class("toothbrush_crack", 0, "up_crack")
         self.add_class("toothbrush_crack", 1, "down_crack")
         self.add_class("toothbrush_crack", 2, "line_crack")
@@ -113,14 +113,14 @@ class ToothBrushCrackDataset(utils.Dataset):
             # load_mask() needs the image size to convert polygons to masks.
             # Unfortunately, VIA doesn't include it in JSON, so we must read
             # the image. This is only managable since the dataset is tiny.
-            name_dict = {'0': 0, '1': 1, '2': 2, '3': 3}
+            name_dict = {'0': 1, '1': 2, '2': 3, '3': 4}
             num_ids = [name_dict[a] for a in objects]
 
 
             image_path = os.path.join(dataset_dir, a['filename'])
             image = skimage.io.imread(image_path)
             height, width = image.shape[:2]
-            print("image name : ", a['filename'], "ids : ", num_ids)
+            #print("image name : ", a['filename'], "ids : ", num_ids)
             self.add_image(
                 "toothbrush_crack",
                 image_id=a['filename'],  # use file name as a unique image id
@@ -169,7 +169,7 @@ class ToothBrushCrackDataset(utils.Dataset):
         # one class ID only, we return an array of 1s
 
         num_ids = np.array(num_ids, dtype=np.int32)
-        print("load_ mask_num_ids", num_ids)
+        #print("load_ mask_num_ids", num_ids)
         # return mask.astype(np.bool_), np.ones([mask.shape[-1]], dtype=np.int32)
         return mask, num_ids
 
@@ -203,7 +203,7 @@ def train(model):
 
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=20,
+                epochs=30,
                 layers='3+')
 
 
@@ -239,13 +239,13 @@ def detect_and_color_splash(model, image_path=None, video_path=None, img_file_na
         # Detect objects
         r = model.detect([image], verbose=1)[0]
         # bounding box visualize
-        class_names = ['bg','0','1','2','3']
+        class_names = ['bg','1','2','3','4']
         bbox = utils.extract_bboxes(r['masks'])
         file_name_bb = "bb_splash_{}".format(img_file_name)
         save_path_bb = os.path.join(args.image, 'result', file_name_bb)
 
         ## for check
-        print("class_ids", r['class_ids'])
+        #print("class_ids", r['class_ids'])
 
         visualize.display_instances(save_path_bb,image_path, image, bbox, r['masks'], r['class_ids'], class_names, r['scores'])
         # skimage.io.imsave(save_path_bb, bb_splash)
@@ -309,11 +309,11 @@ if __name__ == '__main__':
                         help="'train' or 'splash'")
     parser.add_argument('--dataset', required=False,
                         metavar="/path/to/balloon/dataset/",
-                        default='./crack_dataset/',
+                        default='./1217_crack_dataset/',
                         help='Directory of the Balloon dataset')
     parser.add_argument('--weights', required=False,
                         metavar="/path/to/weights.h5",
-                        default='./mask_rcnn_toothbrush_crack_0002.h5',
+                        default='./mask_rcnn_toothbrush_crack_0007.h5',
                         help="Path to weights .h5 file or 'coco'")
     parser.add_argument('--logs', required=False,
                         default=DEFAULT_LOGS_DIR,
@@ -395,8 +395,8 @@ if __name__ == '__main__':
         # each image in folder
         image_path = args.image
         dirs = os.listdir(image_path)
-        print(dirs)
-        images = [file for file in dirs if file.endswith('.bmp')]
+        # print(dirs)
+        images = [file for file in dirs if file.endswith('.png') or file.endswith('.bmp')]
         for img in images:
             imgname = os.path.join(image_path, img)
             onlyname, _ = os.path.splitext(img)
