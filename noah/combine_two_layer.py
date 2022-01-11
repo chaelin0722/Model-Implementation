@@ -1,3 +1,8 @@
+## checklist
+
+## file hwakjangja..  .jpg or .png or .bmp
+## test_dir name!! check test_dir in visualize.py too!
+
 
 import os
 import sys
@@ -13,7 +18,7 @@ from keras.layers import Dense
 from keras.optimizers import Adam
 import time
 import tensorflow as tf
-from efficientnet.keras import EfficientNetB3
+from efficientnet.keras import EfficientNetB3, EfficientNetB0
 from keras.models import load_model
 from sklearn.metrics import confusion_matrix
 
@@ -25,21 +30,21 @@ ROOT_DIR = os.path.abspath("../")
 from PIL import Image
 
 sys.path.append(ROOT_DIR)  # To find local version of the library
-from mrcnn.config import Config
-from mrcnn import model as modellib, utils
-from mrcnn import visualize
+from mrcnn_combine.config import Config
+from mrcnn_combine import model as modellib, utils
+from mrcnn_combine import visualize
 import time
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "3"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 # DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_LOGS_DIR = "./logs"
-DEFAULT_IMAGE_DIR = "./test"  #./val"
-DEFAULT_MRCNN_MODEL_DIR = "./mask_rcnn_toothbrush_head_0015.h5"
-DEFAULT_EFF_MODEL_DIR = '/home/clkim/PycharmProjects/NOAH/dataset/checkpoints/efficient-best_weight_1014.h5'
+DEFAULT_IMAGE_DIR = "/home/clkim/PycharmProjects/NOAH/dataset/0110_dataset"  #./val"
+DEFAULT_MRCNN_MODEL_DIR = "/home/clkim/PycharmProjects/NOAH/dataset/mask_rcnn_toothbrush_head_0020.h5"  # val_loss: 0.5712 - val_rpn_class_loss: 0.0032 - val_rpn_bbox_loss: 0.1024 - val_mrcnn_class_loss: 0.1715 - val_mrcnn_bbox_loss: 0.0946 - val_mrcnn_mask_loss: 0.3060
+DEFAULT_EFF_MODEL_DIR = '/home/clkim/PycharmProjects/NOAH/dataset/checkpoints/efficient-best_weight_220111.h5'
 
 ############################################################
 #  Configurations
@@ -122,6 +127,8 @@ def detect_and_color_splash(model, image_path=None, img_file_name=None):
     visualize.display_instances(save_path_bb, image_path, image, bbox, r['masks'], r['class_ids'], class_names,
                                 r['scores'])
 
+    print("scores =", r['scores'])
+#    skimage.io.imsave(save_path_bb, bb_splash)
 
     splash = color_splash(image, r['masks'])
     # Save output
@@ -140,11 +147,9 @@ def detect_and_color_splash(model, image_path=None, img_file_name=None):
 ############################################################
 result =[]
 class_time = []
+
 def binary_classification(imgname, model):
-
-
     test_dir = os.path.join(DEFAULT_IMAGE_DIR+'/cropped/'+imgname)
-
 
     test_datagen = ImageDataGenerator(
         rescale=1 / 255
@@ -225,7 +230,7 @@ if __name__ == '__main__':
 
     ##### EFFICIENTNET
 
-    efficient_net = EfficientNetB3(
+    efficient_net = EfficientNetB0(
         weights='imagenet',
         input_shape=(32, 32, 3),
         include_top=False,
@@ -247,10 +252,12 @@ if __name__ == '__main__':
     # each image in folder
     image_path = DEFAULT_IMAGE_DIR
     image_dir = os.path.join(image_path + "/test")
-
     dirs = os.listdir(image_dir)
     # print(dirs)
-    images = [file for file in dirs if file.endswith('.bmp')]
+
+    #images = [file for file in dirs if file.endswith('.bmp')]
+    images = [file for file in dirs if file.endswith('.png') or file.endswith('.jpg') or file.endswith('.bmp')]
+
     # print("len iamges :::: ", len(images))
     for img in images:
         imgname = os.path.join(image_dir, img)
