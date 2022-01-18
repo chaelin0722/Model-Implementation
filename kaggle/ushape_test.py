@@ -45,12 +45,11 @@ generator.load_state_dict(torch.load("./saved_models/G/generator_795.pth"))
 
 
 img_size = 256
-path = '/home/clkim/Projects/kaggle/train_images/video_0'
-path_gen = '/home/clkim/Projects/kaggle/train_images/video_0_gen'
+path = '../kaggle/train_images/video_1'
+path_gen = '../kaggle/train_images/video_1_gen'
 
 def predict(img_paths, stride=128, batch_size=1):
     results = []
-
     for img_path in os.listdir(img_paths):
         if img_path in os.listdir(path_gen):
             print(f"{img_path}, already exist")
@@ -90,7 +89,7 @@ def predict(img_paths, stride=128, batch_size=1):
                         pred = output[3].data
 
                         # cropped image output
-                        #save_image(pred, "./test/output/cropped_" + img_path, nrow=5, normalize=True)
+                        save_image(pred, "./test/output/cropped_" + img_path, nrow=5, normalize=True)
 
                         crop = []
                         batch_count = 0
@@ -111,25 +110,11 @@ def predict(img_paths, stride=128, batch_size=1):
             results = np.array(result_img).astype(dtype)
             results = torch.from_numpy(results)
             results = results.permute(2, 0, 1).unsqueeze(0)# tensor (b, c, h, w)
-            save_image(results, "/home/clkim/Projects/kaggle/train_images/video_0_gen/" + img_path, nrow=5, normalize=True)
+            save_image(results, "/home/clkim/Projects/kaggle/train_images/video_1_gen/" + img_path, nrow=5, normalize=True)
 
-        return results
+    return results
 
 
 if __name__ == "__main__":
 
     predict(path)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
