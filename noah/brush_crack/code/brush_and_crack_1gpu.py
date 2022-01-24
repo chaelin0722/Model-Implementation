@@ -43,10 +43,10 @@ os.environ['CUDA_VISIBLE_DEVICES'] = "2"
 # through the command line argument --logs
 # DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_LOGS_DIR = "./logs"
-DEFAULT_IMAGE_DIR = "/home/clkim/PycharmProjects/NOAH/dataset/0124_dataset"
-DEFAULT_BRUSH_DIR = "/home/clkim/PycharmProjects/NOAH/dataset/mask_rcnn_toothbrush_head_0020.h5"  # val_loss: 0.5712 - val_rpn_class_loss: 0.0032 - val_rpn_bbox_loss: 0.1024 - val_mrcnn_class_loss: 0.1715 - val_mrcnn_bbox_loss: 0.0946 - val_mrcnn_mask_loss: 0.3060
-DEFAULT_EFF_MODEL_DIR = '/home/clkim/PycharmProjects/NOAH/dataset/checkpoints/efficient-best_weight_220119_2.h5'
-DEFAULT_CRACK_DIR='/home/yjkim/NOAH/crack_weight_h5/mask_rcnn_toothbrush_crack__0036_tt47.h5'
+DEFAULT_IMAGE_DIR = "/dataset/0124_dataset"
+DEFAULT_BRUSH_DIR = "/dataset/mask_rcnn_toothbrush_head_0020.h5" 
+DEFAULT_EFF_MODEL_DIR = '/checkpoints/efficient-best_weight_220119_2.h5'
+DEFAULT_CRACK_DIR='./mask_rcnn_toothbrush_crack__0036_tt47.h5'
 ############################################################
 #  Configurations
 ############################################################
