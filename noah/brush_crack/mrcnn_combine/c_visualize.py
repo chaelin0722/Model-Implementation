@@ -121,6 +121,7 @@ def display_instances(save_path, image, boxes, masks, class_ids, class_names,
     ax.set_title(title)
 
     masked_image = image.astype(np.uint32).copy()
+    lbList = []
     for i in range(N):
         color = colors[i]
 
@@ -146,6 +147,7 @@ def display_instances(save_path, image, boxes, masks, class_ids, class_names,
         ax.text(x1, y1 + 8, caption,
                 color='w', size=11, backgroundcolor="none")
 
+        lbList.append(label)
         # Mask
         mask = masks[:, :, i]
         if show_mask:
@@ -168,6 +170,7 @@ def display_instances(save_path, image, boxes, masks, class_ids, class_names,
     if auto_show:
         plt.show()
 
+    return lbList
 
 def display_differences(image,
                         gt_box, gt_class_id, gt_mask,
