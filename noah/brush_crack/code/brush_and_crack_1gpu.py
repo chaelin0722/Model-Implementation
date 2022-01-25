@@ -1,9 +1,3 @@
-## checklist
-
-## file hwakjangja..  .jpg or .png or .bmp
-## test_dir name!! check test_dir in visualize.py too!
-
-
 import os
 import sys
 import json
@@ -37,16 +31,15 @@ from mrcnn_combine import c_visualize
 import time
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ['CUDA_VISIBLE_DEVICES'] = "2"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
-# Directory to save logs and model checkpoints, if not provided
-# through the command line argument --logs
 # DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_LOGS_DIR = "./logs"
-DEFAULT_IMAGE_DIR = "/dataset/0124_dataset"
-DEFAULT_BRUSH_DIR = "/dataset/mask_rcnn_toothbrush_head_0020.h5" 
-DEFAULT_EFF_MODEL_DIR = '/checkpoints/efficient-best_weight_220119_2.h5'
-DEFAULT_CRACK_DIR='./mask_rcnn_toothbrush_crack__0036_tt47.h5'
+DEFAULT_IMAGE_DIR = "/"
+DEFAULT_BRUSH_DIR = "/.h5"  
+DEFAULT_EFF_MODEL_DIR = '.h5'
+DEFAULT_CRACK_DIR='/.h5'
+
 ############################################################
 #  Configurations
 ############################################################
@@ -84,7 +77,7 @@ class ToothBrushCrackConfig(Config):
     IMAGES_PER_GPU = 2
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 4 #1 + 1  # Background + balloon
+    NUM_CLASSES = 1 + 4 # 1 + 1  # Background + balloon
 
     # Number of training steps per epoch
     STEPS_PER_EPOCH = 100
@@ -127,8 +120,6 @@ def crack_detect_and_color_splash(model, image_path=None, img_file_name=None):
     print(f"{inference_time:.2f} sec for inferencing_crack {img_file_name}")
     crack_detect_time.append(inference_time)
 
-
-
     # bounding box visualize
     class_names = ['bg','1','2','3','4']
     bbox = utils.extract_bboxes(r['masks'])
@@ -138,7 +129,9 @@ def crack_detect_and_color_splash(model, image_path=None, img_file_name=None):
     ## for check
     #print("class_ids", r['class_ids'])
 
-    c_visualize.display_instances(save_path_bb, image, bbox, r['masks'], r['class_ids'], class_names, r['scores'])
+    lbList = []
+    lbList = c_visualize.display_instances(save_path_bb, image, bbox, r['masks'], r['class_ids'], class_names, r['scores'])
+    print("crack label list: ", lbList)
     # skimage.io.imsave(save_path_bb, bb_splash)
     # Color splash
     splash = color_splash(image, r['masks'])
@@ -148,8 +141,15 @@ def crack_detect_and_color_splash(model, image_path=None, img_file_name=None):
     save_path = os.path.join(DEFAULT_IMAGE_DIR, 'result_crack', file_name)
     skimage.io.imsave(save_path, splash)
 
+    # classification to error list & normality list
+    for class_n in lbList:
+        if (class_n == '1' or class_n == '2' or class_n == '3'):
+            print(f"{file_name} is error crack toothbrush")
+            return 1
 
     print("Saved to ", save_path)
+
+    return 0
 
 
 brush_detect_time = []
@@ -341,6 +341,8 @@ if __name__ == '__main__':
     err_toothbrush_total = []
     each_toothbrush_info_total =[]
     submission = []
+    err_crack_List = []
+    normList = []
     ## arrange results and make csv file
     for img in images:
         imgname = os.path.join(image_dir, img)
@@ -349,14 +351,20 @@ if __name__ == '__main__':
         # output_imgname = os.path.join(image_path, imgname_png)
 
         # CRACK
-        crack_detect_and_color_splash(crack_model, image_path=imgname, img_file_name=imgname_png)
+        error_crack = crack_detect_and_color_splash(crack_model, image_path=imgname, img_file_name=imgname_png)
 
         # BRUSH
         brush_detect_and_color_splash(brush_model, image_path=imgname, img_file_name=imgname_png)
+        error_brush = binary_classification(onlyname, eff_model)
 
-        brush_err_toothbrush = binary_classification(onlyname, eff_model)
+        if error_crack:
+            err_crack_List.append(img)
+        else:
+            normList.append(img)
 
-        submission.append(brush_err_toothbrush)
+
+
+        submission.append(error_brush)
 
         #print(each_toothbrush_preds)
         #print(err_toothbrush_list)
@@ -366,6 +374,10 @@ if __name__ == '__main__':
         writer = csv.writer(file)
         writer.writerow(submission)
 
+    print("불량 crack 이미지 이름: ", err_crack_List)
+    print("불량 crack 개수: ", len(err_crack_List))
+    print("정상 crack 이미지 이름: " ,normList)
+    print("정상 crack 개수: ", len(normList))
 
     ### compute time
     classi_avg = sum(class_time, 0.0) / len(class_time)
