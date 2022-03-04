@@ -1,9 +1,10 @@
 import cv2, os
 import numpy as np
-
+import time
 
 # each image in folder
-image_path = 'dataset/side_dataset/'
+#image_path = '/home/ivpl-d28/Pycharmprojects/NOAH/dataset/side_dataset/'
+image_path = '/home/ivpl-d28/Pycharmprojects/NOAH/dataset/side_dataset/300_/'
 dirs = os.listdir(image_path)
 # print(dirs)
 images = [file for file in dirs if file.endswith('.png') or file.endswith('.bmp')]
@@ -14,6 +15,8 @@ sum_wpix = []
 w_trim=0
 for _img in images:
     imgname = os.path.join(image_path, _img)
+
+    total_start = time.time()
     image = cv2.imread(imgname)
     image = cv2.resize(image, (700, 500))
     img = image.copy()  # contour 좌표를 구하기 위한 원본 복사 이미지
@@ -22,14 +25,19 @@ for _img in images:
     # cv2.imshow('result_image', image)
     # cv2.waitKey(0)
 
+    y, x= img.shape[:2]
+
+    # right image trim
+    img = img[:, :x-40]
+    img1 = img1[:, :x-40]
     h, w = img.shape[:2]
     h1, w1 = img1.shape[:2]
 
     w_trim = np.sum(img[:10, :10] == 255)
 
     if w_trim >= 5:
-        img = image[40:, :]
-        img1 = image[40:, :]
+        img = img[40:, :]
+        img1 = img1[40:, :]
         h, w = img.shape[:2]
         h1, w1 = img1.shape[:2]
 
@@ -54,11 +62,11 @@ for _img in images:
     total = 0
 
     contours_image = cv2.drawContours(img, contours, -1, (0, 255, 0), 3)
-    # cv2.imshow('contours_image', contours_image)
+    #cv2.imshow('contours_image', contours_image)
 
     ##cv2.imwrite('contoured.bmp', contours_image)
 
-    # cv2.waitKey(0)
+    #cv2.waitKey(0)
 
     contours_xy = np.array(contours)
     print(contours_xy.shape)
@@ -91,27 +99,59 @@ for _img in images:
     h = y_max - y_min
 
 
+    roi_start = time.time()
+    cv2.rectangle(img1, (x_min - 18, y_min - 23), (x_max + 18, y_max), (40,40,40), -1)
 
-    for j in range(h1):
-        for i in range(w1):
-            if i >= x_min - 18 and i <= x_max + 18 and j >= y_min - 23 and j <= y_max:
-                img1[j, i] = 40
-
+    roi_end = time.time()
+    print("do rect : ", roi_end - roi_start)
     # result area
-    roi_img = img1[:y + h - 5, :]
+    roi_img = img1[:y + h - 10, :]
 
+    cv2.imwrite(f'/home/ivpl-d28/Pycharmprojects/NOAH/dataset/side_dataset/300_/roi{_img}', roi_img)
     #make binary image
     roi_gray_img = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
-    ret, thresh1 = cv2.threshold(roi_gray_img, 127, 255, cv2.THRESH_BINARY)
+    ret, thresh1 = cv2.threshold(roi_gray_img, 90, 255, cv2.THRESH_BINARY)
 
     #cv2.imshow("binary", thresh1)
     #cv2.waitKey(0)
     a, b, c = roi_img.shape
-    for j in range(a):
-        for i in range(b):
-            num_wpix = np.sum(thresh1 == 255)
+    pix_start = time.time()
+    num_wpix = np.sum(thresh1 == 255)
 
+    pix_end = time.time()
 
+    print("pix count time : ", pix_end - pix_start)
 
     if num_wpix <= 10:
         norm_list.append(_img)
+
+    total_end = time.time()
+    print("total count time : ", total_end - total_start)
+    #cv2.imwrite(f'/home/ivpl-d28/Pycharmprojects/NOAH/dataset/side_dataset/result/{_img}', thresh1)
+    # cv2.imshow('result_image', roi_img)
+    # cv2.waitKey(0)
+    '''
+    canny = cv2.Canny(roi_img, 90, 255)
+    lines = cv2.HoughLinesP(canny, 0.8, np.pi / 180, 80, minLineLength = 10, maxLineGap = 10)
+    cv2.imshow('canny_image', canny)
+    #cv2.imwrite('result_image.bmp', canny)
+    cv2.waitKey(0)
+
+    count = 0
+
+    for line in lines:
+        x1,y1,x2,y2 = line[0]
+        theta = line[0][1]
+        #if theta > 90 and theta < 300:
+        cv2.line(roi_img,(x1,y1),(x2,y2),(0,255,0),1)
+        count += 1
+
+    print('the number of lines: ', count)
+
+    #cv2.imshow('result_image', roi_img)
+    #cv2.imwrite('result_image.bmp', roi_img)
+    #cv2.waitKey(0)
+    '''
+
+
+print(norm_list)
