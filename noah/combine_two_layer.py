@@ -34,21 +34,22 @@ from mrcnn_combine.config import Config
 from mrcnn_combine import model as modellib, utils
 from mrcnn_combine import visualize
 import time
+import time
 import os
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ['CUDA_VISIBLE_DEVICES'] = "3"
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 # DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_LOGS_DIR = "./logs"
-DEFAULT_IMAGE_DIR = "/home/clkim/PycharmProjects/NOAH/dataset/0110_dataset"  #./val"
-DEFAULT_MRCNN_MODEL_DIR = "/home/clkim/PycharmProjects/NOAH/dataset/mask_rcnn_toothbrush_head_0020.h5"  # val_loss: 0.5712 - val_rpn_class_loss: 0.0032 - val_rpn_bbox_loss: 0.1024 - val_mrcnn_class_loss: 0.1715 - val_mrcnn_bbox_loss: 0.0946 - val_mrcnn_mask_loss: 0.3060
-DEFAULT_EFF_MODEL_DIR = '/home/clkim/PycharmProjects/NOAH/dataset/checkpoints/efficient-best_weight_220111.h5'
+DEFAULT_IMAGE_DIR = "./0223_dataset"  #./val"
+DEFAULT_MRCNN_MODEL_DIR = "./mask_rcnn_toothbrush_head_0017.h5" 
+DEFAULT_EFF_MODEL_DIR = '//efficient-best_weight_220119_2.h5'
 
 ############################################################
 #  Configurations
 ############################################################
+
 
 
 class ToothBrushHeadConfig(Config):
@@ -99,7 +100,6 @@ detect_time = []
 def detect_and_color_splash(model, image_path=None, img_file_name=None):
     assert image_path
 
-
     # Run model detection and generate the color splash effect
     start_inference = time.time()
     print("Running on {}".format(image_path))
@@ -124,7 +124,7 @@ def detect_and_color_splash(model, image_path=None, img_file_name=None):
 
     # print("image_path", image_path)
 
-    visualize.display_instances(save_path_bb, image_path, image, bbox, r['masks'], r['class_ids'], class_names,
+    visualize.display_instances(DEFAULT_IMAGE_DIR, save_path_bb, image_path, image, bbox, r['masks'], r['class_ids'], class_names,
                                 r['scores'])
 
     print("scores =", r['scores'])
@@ -145,56 +145,69 @@ def detect_and_color_splash(model, image_path=None, img_file_name=None):
 ############################################################
 #  classification
 ############################################################
-result =[]
+#result =[]
 class_time = []
 
 def binary_classification(imgname, model):
     test_dir = os.path.join(DEFAULT_IMAGE_DIR+'/cropped/'+imgname)
 
-    test_datagen = ImageDataGenerator(
-        rescale=1 / 255
-    )
+    # if test_dir images are not 25 or 34, do not go to binary_classification
+    dir = os.listdir(os.path.join(test_dir+'/test'))
 
-    test_generator = test_datagen.flow_from_directory(
-        test_dir,
-        target_size=(32, 32),
-        batch_size=1,
-        shuffle=False,
-        class_mode=None
-    )
-    start_classification = time.time()
-    preds = model.predict_generator(test_generator, steps=len(test_generator.filenames))
+    crop_images = [file for file in dir if file.endswith('.png') or file.endswith('.jpg') or file.endswith('.bmp')]
 
-    end_classification = time.time()
+    if len(crop_images)  == 25 or len(crop_images)  == 34:
 
-    ## check time
-    inference_time = end_classification - start_classification
-    print(f"{inference_time:.2f} sec for inferencing toothbrush hair")
-    class_time.append(inference_time)
+        test_datagen = ImageDataGenerator(
+            rescale=1 / 255
+        )
+
+        test_generator = test_datagen.flow_from_directory(
+            test_dir,
+            target_size=(32, 32),
+            batch_size=1,
+            shuffle=False,
+            class_mode=None
+        )
+        start_classification = time.time()
+        preds = model.predict_generator(test_generator, steps=len(test_generator.filenames))
+
+        end_classification = time.time()
+
+        ## check time
+        inference_time = end_classification - start_classification
+        print(f"{inference_time:.2f} sec for inferencing toothbrush hair")
+        class_time.append(inference_time)
 
 
-    # print(preds)
-    image_ids = [name.split('/')[-1] for name in test_generator.filenames]
-    predictions = preds.flatten()
+        # print(preds)
+        image_ids = [name.split('/')[-1] for name in test_generator.filenames]
+        predictions = preds.flatten()
 
-    error = []
-    for i in range(len(test_generator.filenames)):
-        if predictions[i] > 0.5:
-            error.append('error')
+        error = []
+        for i in range(len(test_generator.filenames)):
+            if predictions[i] > 0.5:
+                error.append('error')
 
-        else:
-            error.append('normal')
+            else:
+                error.append('normal')
 
-    data = {'filename': image_ids, 'true_label': test_generator.classes, 'category': error}
+        data = {'filename': image_ids, 'true_label': test_generator.classes, 'category': error}
 
-    submission = pd.DataFrame(data)
-    # final classification! whether error or not
+        submission = pd.DataFrame(data)
+        # final classification! whether error or not
 
-    if (submission['category'] == 'error').any():
-        print(f'{imgname} is error tooth brush')
-        result.append(imgname)
+        if (submission['category'] == 'error').any():
+            print(f'[classification] {imgname} is error tooth brush')
+            #result.append(imgname)
 
-    return result
+            return imgname
+
+    else:
+        print(f'[detection] {imgname} is error tooth brush')
+        return imgname
+
+
 ############################################################
 #  main
 ############################################################
@@ -253,25 +266,36 @@ if __name__ == '__main__':
     image_path = DEFAULT_IMAGE_DIR
     image_dir = os.path.join(image_path + "/test")
     dirs = os.listdir(image_dir)
-    # print(dirs)
 
-    #images = [file for file in dirs if file.endswith('.bmp')]
     images = [file for file in dirs if file.endswith('.png') or file.endswith('.jpg') or file.endswith('.bmp')]
 
     # print("len iamges :::: ", len(images))
+    err_toothbrush_total = []
+    each_toothbrush_info_total =[]
+    submission = []
+    ## arrange results and make csv file
     for img in images:
         imgname = os.path.join(image_dir, img)
         onlyname, _ = os.path.splitext(img)
         imgname_png = onlyname + '.png'
         # output_imgname = os.path.join(image_path, imgname_png)
+
+        # detection
         detect_and_color_splash(mrcnn_model, image_path=imgname, img_file_name=imgname_png)
+        #
 
-        err_toothbrush_list = binary_classification(onlyname, eff_model)
+        ## classification
+        err_toothbrush = binary_classification(onlyname, eff_model)
 
-        print(err_toothbrush_list)
-        print("ddd_ time: ", detect_time)
-        print("ccc_ time: ", class_time)
+        submission.append(err_toothbrush)
 
+        #print(each_toothbrush_preds)
+        #print(err_toothbrush_list)
+        #print("ddd_ time: ", detect_time)
+        #print("ccc_ time: ", class_time)
+    with open("220303_result_info.csv", "wt",  encoding='utf-8-sig') as file:  #utf-8-sig for encode korean
+        writer = csv.writer(file)
+        writer.writerow(submission)
 
 
     ### compute time
