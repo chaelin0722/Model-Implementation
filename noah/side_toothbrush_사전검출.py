@@ -146,3 +146,4 @@ for _img in images:
     cv2.imwrite(f'ts/hstack_{_img}', result)
 
 print(norm_list)
+
