@@ -1,5 +1,5 @@
 ##
-# FINAL! + result image
+# FINAL!
 #
 ###
 import cv2, os
@@ -9,11 +9,14 @@ import matplotlib.pyplot as plt
 from findpeaks import findpeaks
 from scipy.signal import find_peaks
 import csv
+from PIL import Image
 
-image_path = '/side_brush'
+image_path = '/home/yjkim/NOAH/gongin/datasets/side_brush'
 dirs = os.listdir(image_path)
 # print(dirs)
 images = [file for file in dirs if file.endswith('.bmp')]
+
+
 
 print("how many images :", len(images))
 
@@ -44,6 +47,8 @@ def getMinMax(image_c):
     contours_image = cv2.drawContours(image_c.copy(), contours, -1, (0, 0, 255), 3)
     #cv2.imshow("rr", contours_image)
     #cv2.waitKey(0)
+    #cv2.imwrite(f'/home/ivpl-d28/Pycharmprojects/NOAH/dataset/side_dataset/contour{_img}', contours_image)
+
     x_min, x_max = 0, 0
     value = list()
     for i in range(len(contours_xy)):
@@ -130,6 +135,8 @@ def get_hole_distance(getimg, img_draw):
     #cv2.imshow('image line', trim_h_draw)
     #cv2.waitKey(0)
 
+    #cv2.imwrite(f"/home/clkim/PycharmProjects/NOAH/dataset/side_dataset/0712_test/hole_{_img}.jpg", trim_h_draw)
+
     return fst_pix, last_pix, f_m, s_m, l_m, distance, trim_handle, size_hole
 
 
@@ -207,7 +214,13 @@ for _img in images:
     cv2.rectangle(opening, (x_min - 18, y_min - 23), (x_max + 18, y_max), (0, 0, 0), -1)
     iimg_draw = img_draw.copy()
     recc = cv2.rectangle(iimg_draw, (x_min - 18, y_min - 23), (x_max + 18, y_max), (0,0, 255), 1)
-    cv2.imwrite(f"/preprocess_{_img}",recc)
+    cv2.imwrite(f"/home/clkim/PycharmProjects/NOAH/dataset/side_dataset/0712_test/preprocess_result/preprocess_{_img}",recc)
+    cv2.imshow("preprocessing : ", recc)
+    cv2.waitKey(3)
+
+    #os.system(f"xdg-open /home/clkim/PycharmProjects/NOAH/dataset/side_dataset/0712_test/preprocess_result/preprocess_{_img}")
+    #plt.imshow(recc)
+    #plt.show()
 
     # result area
     roi_img = opening[:y + h - 10, :]
@@ -225,15 +238,16 @@ for _img in images:
 
     start = time.time()
     if num_wpix > 18 and num_wpix <= 4000:
-        # print(f'{_img} is error toothbrush')
+        print(f'{_img} is error toothbrush - preprocessing')
         pre_err_list.append(_img)
+
+
 
     if num_wpix <= 18 or num_wpix > 4000:
         print(f'{_img} is checking - postprocessing')
-
         name = _img.split(".")[0]
-        ## get pok!
 
+        ## get pok!
         morph_img_post = cv2.cvtColor(img_morph, cv2.COLOR_BGR2GRAY)
         ret, morph_thresh_post = cv2.threshold(morph_img_post, 70, 255, cv2.THRESH_BINARY)
 
@@ -354,8 +368,9 @@ for _img in images:
         for i in range(9):
             cv2.line(brush_draw, ((w_list[i] + cut[i]), (min_pix[i]+bhh)), ((w_list[i+1] + cut[i+1]),(min_pix[i+1]+bhh)) , (0,0,255), 2)
 
-        cv2.imwrite(f"/graph_{_img}", brush_draw)
-
+        cv2.imwrite(f"/home/clkim/PycharmProjects/NOAH/dataset/side_dataset/0712_test/post_result/graph_{_img}", brush_draw)
+        cv2.imshow("postprocessing : ", brush_draw)
+        cv2.waitKey(3)
         # a. neighbor diff / hole_distance >= 0.26
         if round((max(neighbor_diff) / hole_distance),2) >= 0.26:
             post_err_list.append(_img)
