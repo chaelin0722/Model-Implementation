@@ -1,0 +1,16 @@
+# 가상 환경 생성
+conda create -n detectron python=3.8
+
+# 깃허브 환경
+git clone https://github.com/facebookresearch/detectron2.git
+
+# opencv, pyyaml
+pip install opencv-python
+pip install pyyaml==5.1
+
+# torch
+# cuda 10.1 torch 1.8.1
+pip install torch==1.8.1+cu101 torchvision==0.9.1+cu101 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html
+
+
+python -m pip install -e detectron2  # detectron2 폴더 바깥에서
